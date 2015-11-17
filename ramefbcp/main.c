@@ -262,23 +262,29 @@ static int process()
         int x, y, read_status;
 
         ret = vc_dispmanx_snapshot(display, screen_resource, 0);
-        vc_dispmanx_resource_read_data(screen_resource, &rect1, fbp, fbvinfo.xres * fbvinfo.bits_per_pixel / 8);
+        vc_dispmanx_resource_read_data(screen_resource, &rect1, fbp,
+                                       fbvinfo.xres * fbvinfo.bits_per_pixel / 8);
 
         if (inputctx != NULL)
         {
-            int read_status = input_read_line(line, LINESIZE, inputctx);
-            if (read_status == -1)
-            {
-                fprintf(stderr, "EOF\n");
-                s_alive = 0;
-            }
-            else if (read_status > 0)
-            {
-                dbg_printf("Line: %s\n", line);
+            int try_read_more;
+            do {
+                try_read_more = 0;
+                int read_status = input_read_line(line, LINESIZE, inputctx);
+                if (read_status == -1)
+                {
+                    fprintf(stderr, "EOF\n");
+                    s_alive = 0;
+                }
+                else if (read_status > 0)
+                {
+                    dbg_printf("Line: %s\n", line);
 
-                line_to_infodisplay(infodisplay, line);
-                need_to_refresh_display = 1;
-            }
+                    line_to_infodisplay(infodisplay, line);
+                    need_to_refresh_display = 1;
+                    try_read_more = 1;
+                }
+            } while (try_read_more);
         }
 
         if (infodisplay != NULL && need_to_refresh_display)
