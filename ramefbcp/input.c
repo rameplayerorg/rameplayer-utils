@@ -37,6 +37,10 @@ void input_close(INPUT_CTX *ctx)
 }
 
 
+// TODO:
+// if input contains many rows, rest of rows are pending at the
+// buffer, and input starts lagging or something
+
 /* Reads a line to dest (with max dest_size including 0 at end)
  * using ctx as the working context.
  * Return values:
@@ -59,7 +63,7 @@ int input_read_line(char *dest, const size_t dest_size, INPUT_CTX *ctx)
         return -1;
 
     if (!ctx->eof)
-    {
+    do {
         int fd = ctx->infd;
 
         FD_ZERO(&rfds);
@@ -78,7 +82,7 @@ int input_read_line(char *dest, const size_t dest_size, INPUT_CTX *ctx)
         else if (status == 0)
         {
             // not enough data yet
-            return 0;
+            break;
         }
 
         // read data to input (can be partial line or several lines)
@@ -100,7 +104,7 @@ int input_read_line(char *dest, const size_t dest_size, INPUT_CTX *ctx)
             ctx->bufpos += nread;
             ctx->buf[ctx->bufpos] = 0; // available part is always zero-terminated
         }
-    } // !eof
+    } while (0); // !eof
 
     linelength = -1;
     for (a = 0; a < ctx->bufpos; ++a)
