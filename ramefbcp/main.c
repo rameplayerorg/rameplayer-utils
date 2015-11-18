@@ -15,7 +15,7 @@
 #include "infodisplay.h"
 
 
-#define TTF_FILENAME "ramefbcp.ttf"
+#define TTF_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
 
 #define SLEEP_MILLISECONDS_PER_FRAME 25
 
