@@ -2,6 +2,21 @@
 ramefbcp - Secondary LCD display framebuffer updating for Rameplayer.
 
 
+Note:
+
+For now, font path is hardcoded - move included ramefbcp.ttf to:
+/usr/share/fonts/TTF/ramefbcp.ttf
+
+
+TODO:
+- animated "buffering" icon
+- implement proper clipping to infodisplay drawing
+- back and forth auto-scroll feature for too long strings
+- command line param for font path
+- fallback font paths?
+- support for other than 16bpp fb pixel formats?
+
+
 ------------------------------------------------------------
 Contains code based on SDL2_ttf, with original license here:
 ------------------------------------------------------------
@@ -45,9 +60,9 @@ limitations under the License.
 
 
 
-----------------
-Original README:
-----------------
+-------------------------------------------
+Contains code from 'fbcp', original README:
+-------------------------------------------
 
 Raspberry Pi Framebuffer Copy
 =============================

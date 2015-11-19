@@ -356,6 +356,8 @@ void infodisplay_update(INFODISPLAY *disp)
             icon = icon_paused;
         else if (disp->info_status_icon == INFODISPLAY_ICON_STOPPED)
             icon = icon_stopped;
+        else if (disp->info_status_icon == INFODISPLAY_ICON_BUFFERING)
+            icon = icon_buffering;
         if (icon != NULL)
         {
             x = 0;
