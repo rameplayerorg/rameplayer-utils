@@ -307,12 +307,14 @@ static void font_draw_text(fontdata_t *f, const wchar_t *text, size_t len, VGflo
 	int i, prev = 0, cur;
 
 	for (i = 0; i < len; i++) {
-		cur = glyphs[i] = FT_Get_Char_Index(f->face, text[i]);
+		glyphs[i] = cur = FT_Get_Char_Index(f->face, text[i]);
+		adjx[i] = 0.0f;
+		adjy[i] = 0.0f;
 		if (cur) {
 			font_load_glyph(f, cur);
 			if (i && FT_Get_Kerning(f->face, prev, cur, FT_KERNING_DEFAULT, &kerning) == 0) {
-				x += float_from_26_6(kerning.x);
-				y += float_from_26_6(kerning.y);
+				adjx[i-1] = float_from_26_6(kerning.x);
+				adjy[i-1] = float_from_26_6(kerning.y);
 			}
 		}
 		prev = cur;
