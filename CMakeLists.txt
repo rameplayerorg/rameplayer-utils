@@ -8,3 +8,4 @@ include_directories(${FT_INCLUDE_DIRS})
 
 add_subdirectory(ramefbcp)
 add_subdirectory(rametext)
+add_subdirectory(rameclock)
