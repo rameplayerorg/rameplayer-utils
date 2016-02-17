@@ -232,7 +232,7 @@ static void font_unload(fontdata_t *f)
 	int i;
 
 	for (i = 0; i < sizeof(f->loaded_map)/sizeof(f->loaded_map[0]); i++)
-		free(f->loaded_map);
+		free(f->loaded_map[i]);
 	FT_Done_Face(f->face);
 	vgDestroyFont(f->font);
 }
