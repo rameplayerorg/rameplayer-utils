@@ -15,7 +15,11 @@
 #include "infodisplay.h"
 
 
-#define TTF_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 0
+#define VERSION_PATCH 1
+
+#define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
 
 #define SLEEP_MILLISECONDS_PER_FRAME 25
 
@@ -34,6 +38,8 @@ static int s_width = 0, s_height = 0;
 static INFODISPLAY *infodisplay = NULL;
 
 static INPUT_CTX *inputctx;
+
+static const char *s_ttf_filename = NULL;
 
 
 static void print_fb_info(struct fb_var_screeninfo *vinfo, struct fb_fix_screeninfo *finfo)
@@ -240,12 +246,14 @@ static int process()
     // only 16bpp is supported for now:
     if (fbvinfo.bits_per_pixel == 16)
     {
+        if (s_ttf_filename == NULL)
+            s_ttf_filename = TTF_DEFAULT_FILENAME;
         infodisplay = infodisplay_create(s_width, s_height - vid_h,
                                          fbvinfo.red.offset, fbvinfo.red.length,
                                          fbvinfo.green.offset, fbvinfo.green.length,
                                          fbvinfo.blue.offset, fbvinfo.blue.length,
                                          fbvinfo.transp.offset, fbvinfo.transp.length,
-                                         TTF_FILENAME);
+                                         s_ttf_filename);
     }
     else
     {
@@ -341,24 +349,55 @@ int main(int argc, char **argv)
 
     for (int a = 1; a < argc; ++a)
     {
+        if (argv[a] == NULL)
+            continue;
+
+        if (strcmp(argv[a], "-f") == 0)
+        {
+            if (a + 1 < argc && argv[a + 1] != NULL)
+            {
+                FILE *fp;
+                s_ttf_filename = argv[a + 1];
+                fp = fopen(s_ttf_filename, "rb");
+                if (fp == NULL)
+                {
+                    const char *warnfmt = "Given font %s not found (trying default)\n";
+                    syslog(LOG_WARNING, warnfmt, s_ttf_filename);
+                    fprintf(stderr, warnfmt, s_ttf_filename);
+                    s_ttf_filename = NULL;
+                }
+                else
+                {
+                    dbg_printf("Using font: %s\n", s_ttf_filename);
+                    fclose(fp);
+                }
+                ++a;
+                continue;
+            }
+        }
+
         #ifdef DEBUG_SUPPORT
-        if (argv[a] != NULL && strcmp(argv[a], "-d") == 0)
+        if (strcmp(argv[a], "-d") == 0)
             g_debug_info = 1;
         #endif
 
-        if (argv[a] != NULL &&
-            (strcmp(argv[a], "-h") == 0 ||
-             strcmp(argv[a], "-?") == 0 ||
-             strcmp(argv[a], "--help") == 0))
+        if (strcmp(argv[a], "-h") == 0 ||
+            strcmp(argv[a], "-?") == 0 ||
+            strcmp(argv[a], "--help") == 0)
         {
-            printf("Usage:\n"
-                   "  -d  Output debug info to stdout. "
+            printf("ramefbcp version %d.%d.%d\n",
+                   VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+            printf("Usage: (all parameters are optional)\n"
+                   "  -f /path/font.ttf\n"
+                   "     \t Use given font instead of built-in default.\n"
+                   "     \t (default: " TTF_DEFAULT_FILENAME ")\n"
+                   "  -d \t Output debug info to stdout. "
                        #ifdef DEBUG_SUPPORT
                        "(available)\n"
                        #else
                        "(NOT available)\n"
                        #endif
-                   "  -h  This usage info.\n");
+                   "  -h \t This usage info.\n");
             return EXIT_SUCCESS;
         }
     }

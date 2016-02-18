@@ -1,25 +1,21 @@
 
-ramefbcp - Secondary LCD display framebuffer updating for Rameplayer.
-
-
-Note:
-
-For now, font path is hardcoded - move included ramefbcp.ttf to:
-/usr/share/fonts/TTF/ramefbcp.ttf
+ramefbcp - Secondary LCD display framebuffer updating for RamePlayer
+--------------------------------------------------------------------
 
 
 TODO:
 - animated "buffering" icon
 - implement proper clipping to infodisplay drawing
 - back and forth auto-scroll feature for too long strings
-- command line param for font path
-- fallback font paths?
 - support for other than 16bpp fb pixel formats?
 
 
-------------------------------------------------------------
+
+3rd party Licenses & Info
+-------------------------
+
 Contains code based on SDL2_ttf, with original license here:
-------------------------------------------------------------
+
   SDL_ttf:  A companion library to SDL for working with TrueType (tm) fonts
   Copyright (C) 2001-2013 Sam Lantinga <slouken@libsdl.org>
 
@@ -40,9 +36,8 @@ Contains code based on SDL2_ttf, with original license here:
   3. This notice may not be removed or altered from any source distribution.
 
 
------------------------------------------
+
 ramefbcp.ttf ("Droid Sans") Font License:
------------------------------------------
 
 Copyright (C) 2008 The Android Open Source Project
 
@@ -60,16 +55,13 @@ limitations under the License.
 
 
 
--------------------------------------------
-Contains code from 'fbcp', original README:
--------------------------------------------
+Contains code based on code from 'fbcp'. Info from original README:
 
 Raspberry Pi Framebuffer Copy
-=============================
+
 This program used for copy primary framebuffer to secondary framebuffer (eg. FBTFT). It require lastest raspberry pi firmware (> 2013-07-11) to working properly.
 
 Build
------
 
     $ mkdir build
     
