@@ -359,6 +359,7 @@ int main(int argc, char **argv)
                        "(NOT available)\n"
                        #endif
                    "  -h  This usage info.\n");
+            return EXIT_SUCCESS;
         }
     }
 

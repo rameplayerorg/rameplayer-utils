@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 2.8)
 
+find_package(PkgConfig)
+pkg_check_modules(FT freetype2)
+
 SET(COMPILE_DEFINITIONS -Werror -Wall -O3)
+
+include_directories(${FT_INCLUDE_DIRS})
 
 include_directories(/opt/vc/include)
 include_directories(/opt/vc/include/interface/vcos/pthreads)

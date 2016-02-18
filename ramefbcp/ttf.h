@@ -1,9 +1,9 @@
 /*
   ttf.h: TTF rendering functions; based on SDL2_ttf but simplified.
 
-  ---- Original license ----
+  ---- Original license ("zlib license") ----
   SDL_ttf:  A companion library to SDL for working with TrueType (tm) fonts
-  Copyright (C) 2001-2013 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 2001-2016 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -27,6 +27,10 @@
     http://www.freetype.org/
 */
 
+/* Note: In many places, SDL_ttf will say "glyph" when it means "code point."
+   Unicode is hard, we learn as we go, and we apologize for adding to the
+   confusion. */
+
 #ifndef _TTF_H
 #define _TTF_H
 
@@ -37,7 +41,7 @@ extern "C" {
 #endif
 
 
-/* Simple suface struct to replace SDL_Surface.
+/* Simple surface struct to replace SDL_Surface.
  * - assuming surface is always 8bpp (luminance or alpha/opacity)
  */
 typedef struct _TTF_Surface
@@ -51,13 +55,13 @@ extern TTF_Surface * TTF_CreateSurface(int width, int height);
 extern void TTF_FreeSurface(TTF_Surface *surface);
 extern void TTF_ClearSurface(TTF_Surface *surface);
 
-/* The version info tells which SDL_ttf this is based on. */
+/* The version info tells which SDL2_ttf this is based on. */
 
 /* Printable format: "%d.%d.%d", MAJOR, MINOR, PATCHLEVEL
 */
 #define TTF_MAJOR_VERSION   2
 #define TTF_MINOR_VERSION   0
-#define TTF_PATCHLEVEL      12
+#define TTF_PATCHLEVEL      14
 
 /* This macro can be used to fill a version structure with the compile-time
  * version of the ttf library.
@@ -186,7 +190,7 @@ extern void TTF_Quit(void);
 extern int TTF_WasInit(void);
 
 /* Get the kerning size of two glyphs */
-extern int TTF_GetFontKerningSize(TTF_Font *font, int prev_index, int index);
+extern int TTF_GetFontKerningSizeGlyphs(TTF_Font *font, unsigned short previous_ch, unsigned short ch);
 
 extern char * TTF_GetError(void);
 
