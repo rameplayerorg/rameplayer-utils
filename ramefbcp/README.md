@@ -1,13 +1,29 @@
 
-ramefbcp - Secondary LCD display framebuffer updating for RamePlayer
---------------------------------------------------------------------
+ramefbcp
+========
+
+Secondary LCD display framebuffer updating for RamePlayer
+---------------------------------------------------------
+
+What's shown on the screen:
+
+* Thumbnail-sized image of playing video on the small LCD screen
+* Current play position visualization (thin red horizontal bar)
+* Playing status with an icon (Play / Pause / Stop / Buffering)
+* Play time & length (shorthand for formatting row with time int values)
+* Given text from backend: (generic, but examples below)
+  - Filename of current media
+  - IP address
+  - Hostname
+  - "Restart Pending..." info
+  - ...
 
 
 TODO:
 - animated "buffering" icon
 - implement proper clipping to infodisplay drawing
 - back and forth auto-scroll feature for too long strings
-- support for other than 16bpp fb pixel formats?
+- (support for other than 16bpp fb pixel formats?)
 
 
 

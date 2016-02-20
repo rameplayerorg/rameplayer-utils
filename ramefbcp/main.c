@@ -16,8 +16,8 @@
 
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 0
-#define VERSION_PATCH 1
+#define VERSION_MINOR 1
+#define VERSION_PATCH 0
 
 #define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
 
@@ -28,16 +28,7 @@
 #define VID_ASPECT_H 9
 
 
-static struct fb_var_screeninfo fbvinfo;
-static struct fb_fix_screeninfo fbfinfo;
-
-static int s_frame = 0, s_alive = 1;
-
-static int s_width = 0, s_height = 0;
-
-static INFODISPLAY *infodisplay = NULL;
-
-static INPUT_CTX *inputctx;
+static int s_alive = 1;
 
 static const char *s_ttf_filename = NULL;
 
@@ -48,66 +39,67 @@ static void print_fb_info(struct fb_var_screeninfo *vinfo, struct fb_fix_screeni
     if (!g_debug_info)
         return;
 
-    printf("*** fb_fix_screeninfo ***\n");
-    printf("id: %s\n", finfo->id); // is it safe to assume there's 0-terminator?
-    printf("smem_start: %08x\n", (unsigned int)finfo->smem_start);
-    printf("smem_len: %u\n", finfo->smem_len);
-    printf("type: %u\n", finfo->type);
-    printf("type_aux: %u\n", finfo->type_aux);
-    printf("visual: %u\n", finfo->visual);
-    printf("xpanstep: %u\n", finfo->xpanstep);
-    printf("ypanstep: %u\n", finfo->ypanstep);
-    printf("ywrapstep: %u\n", finfo->ywrapstep);
-    printf("line_length: %u\n", finfo->line_length);
-    printf("mmio_start: %08x\n", (unsigned int)finfo->mmio_start);
-    printf("mmio_len: %u\n", finfo->mmio_len);
-    printf("accel: %u\n", finfo->accel);
-    printf("capabilities: %04x\n", finfo->capabilities);
-    printf("*** fb_var_screeninfo ***\n");
-    printf("xres: %u\n", vinfo->xres);
-    printf("yres: %u\n", vinfo->yres);
-    printf("xres_virtual: %u\n", vinfo->xres_virtual);
-    printf("yres_virtual: %u\n", vinfo->yres_virtual);
-    printf("xoffset: %u\n", vinfo->xoffset);
-    printf("yoffset: %u\n", vinfo->yoffset);
-    printf("bits_per_pixel: %u\n", vinfo->bits_per_pixel);
-    printf("grayscale: %u\n", vinfo->grayscale);
-    printf("red.offset,length,msb_right: %u,%u,%u\n", vinfo->red.offset, vinfo->red.length, vinfo->red.msb_right);
-    printf("green.offset,length,msb_right: %u,%u,%u\n", vinfo->green.offset, vinfo->green.length, vinfo->green.msb_right);
-    printf("blue.offset,length,msb_right: %u,%u,%u\n", vinfo->blue.offset, vinfo->blue.length, vinfo->blue.msb_right);
-    printf("transp.offset,length,msb_right: %u,%u,%u\n", vinfo->transp.offset, vinfo->transp.length, vinfo->transp.msb_right);
-    printf("nonstd: %u\n", vinfo->nonstd);
-    printf("activate: %u\n", vinfo->activate);
-    printf("height: %u\n", vinfo->height);
-    printf("width: %u\n", vinfo->width);
-    printf("accel_flags: %08x\n", vinfo->accel_flags);
-    printf("pixclock: %u\n", vinfo->pixclock);
-    printf("left_margin: %u\n", vinfo->left_margin);
-    printf("right_margin: %u\n", vinfo->right_margin);
-    printf("upper_margin: %u\n", vinfo->upper_margin);
-    printf("lower_margin: %u\n", vinfo->lower_margin);
-    printf("hsync_len: %u\n", vinfo->hsync_len);
-    printf("vsync_len: %u\n", vinfo->vsync_len);
-    printf("sync: %u\n", vinfo->sync);
-    printf("vmode: %u\n", vinfo->vmode);
-    printf("rotate: %u\n", vinfo->rotate);
-    printf("colorspace: %u\n", vinfo->colorspace);
-    printf("---\n");
+    dbg_printf("*** fb_fix_screeninfo ***\n");
+    dbg_printf("id: %s\n", finfo->id); // is it safe to assume there's 0-terminator?
+    dbg_printf("smem_start: %08x\n", (unsigned int)finfo->smem_start);
+    dbg_printf("smem_len: %u\n", finfo->smem_len);
+    dbg_printf("type: %u\n", finfo->type);
+    dbg_printf("type_aux: %u\n", finfo->type_aux);
+    dbg_printf("visual: %u\n", finfo->visual);
+    dbg_printf("xpanstep: %u\n", finfo->xpanstep);
+    dbg_printf("ypanstep: %u\n", finfo->ypanstep);
+    dbg_printf("ywrapstep: %u\n", finfo->ywrapstep);
+    dbg_printf("line_length: %u\n", finfo->line_length);
+    dbg_printf("mmio_start: %08x\n", (unsigned int)finfo->mmio_start);
+    dbg_printf("mmio_len: %u\n", finfo->mmio_len);
+    dbg_printf("accel: %u\n", finfo->accel);
+    dbg_printf("capabilities: %04x\n", finfo->capabilities);
+    dbg_printf("*** fb_var_screeninfo ***\n");
+    dbg_printf("xres: %u\n", vinfo->xres);
+    dbg_printf("yres: %u\n", vinfo->yres);
+    dbg_printf("xres_virtual: %u\n", vinfo->xres_virtual);
+    dbg_printf("yres_virtual: %u\n", vinfo->yres_virtual);
+    dbg_printf("xoffset: %u\n", vinfo->xoffset);
+    dbg_printf("yoffset: %u\n", vinfo->yoffset);
+    dbg_printf("bits_per_pixel: %u\n", vinfo->bits_per_pixel);
+    dbg_printf("grayscale: %u\n", vinfo->grayscale);
+    dbg_printf("red.offset,length,msb_right: %u,%u,%u\n", vinfo->red.offset, vinfo->red.length, vinfo->red.msb_right);
+    dbg_printf("green.offset,length,msb_right: %u,%u,%u\n", vinfo->green.offset, vinfo->green.length, vinfo->green.msb_right);
+    dbg_printf("blue.offset,length,msb_right: %u,%u,%u\n", vinfo->blue.offset, vinfo->blue.length, vinfo->blue.msb_right);
+    dbg_printf("transp.offset,length,msb_right: %u,%u,%u\n", vinfo->transp.offset, vinfo->transp.length, vinfo->transp.msb_right);
+    dbg_printf("nonstd: %u\n", vinfo->nonstd);
+    dbg_printf("activate: %u\n", vinfo->activate);
+    dbg_printf("height: %u\n", vinfo->height);
+    dbg_printf("width: %u\n", vinfo->width);
+    dbg_printf("accel_flags: %08x\n", vinfo->accel_flags);
+    dbg_printf("pixclock: %u\n", vinfo->pixclock);
+    dbg_printf("left_margin: %u\n", vinfo->left_margin);
+    dbg_printf("right_margin: %u\n", vinfo->right_margin);
+    dbg_printf("upper_margin: %u\n", vinfo->upper_margin);
+    dbg_printf("lower_margin: %u\n", vinfo->lower_margin);
+    dbg_printf("hsync_len: %u\n", vinfo->hsync_len);
+    dbg_printf("vsync_len: %u\n", vinfo->vsync_len);
+    dbg_printf("sync: %u\n", vinfo->sync);
+    dbg_printf("vmode: %u\n", vinfo->vmode);
+    dbg_printf("rotate: %u\n", vinfo->rotate);
+    dbg_printf("colorspace: %u\n", vinfo->colorspace);
+    dbg_printf("---\n");
 #endif
 }
 
 
-static void line_to_infodisplay(INFODISPLAY *infodisplay, const char *line)
+static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, const char *line)
 {
     switch (line[0])
     {
         case 'X':
         {
-            // text row, e.g. "X1:Please wait..."
+            // text to row number [1..INFODISPLAY_ROW_COUNT].
+            // e.g. "X1:Please wait..."
             int rown = line[1] - '1';
             if (rown >= 0 && rown < INFODISPLAY_ROW_COUNT &&
                 line[2] == ':')
-                infodisplay_set_textrow(infodisplay, rown, &line[3]);
+                infodisplay_set_row_text(infodisplay, rown, &line[3]);
         }
         break;
 
@@ -130,7 +122,21 @@ static void line_to_infodisplay(INFODISPLAY *infodisplay, const char *line)
                 value = line[2] - '0';
             if (value >= INFODISPLAY_ICON_NONE &&
                 value < INFODISPLAY_ICON_COUNT)
-                infodisplay_set_status(infodisplay, (INFODISPLAY_ICON)value);
+                infodisplay_set_row_icon(infodisplay,
+                                         INFODISPLAY_ROW_COUNT - 1,
+                                         (INFODISPLAY_ICON)value);
+        }
+        break;
+
+        case 'V':
+        {
+            // enable or disable video cloning (framebuffer copy)
+            // "V:1" (enable) or "V:0" (disable)
+            int value = -1;
+            if (line[1] == ':')
+                value = line[2] - '0';
+            if (value == 0 || value == 1)
+                *video_enabled = value;
         }
         break;
 
@@ -138,6 +144,7 @@ static void line_to_infodisplay(INFODISPLAY *infodisplay, const char *line)
         {
             // set times (playing & total), values in milliseconds
             // e.g. "T:5100,90000" (comma and second value are optional)
+            // negative value is accepted only for the first value
             int t1 = 0, t2 = -1, comma = 0;
             char tmp[32];
             tmp[31] = 0;
@@ -150,26 +157,33 @@ static void line_to_infodisplay(INFODISPLAY *infodisplay, const char *line)
                 t2 = atoi(&tmp[comma + 1]);
             tmp[comma] = 0;
             t1 = atoi(tmp);
-            infodisplay_set_times(infodisplay, t1, t2);
+            infodisplay_set_row_times(infodisplay, INFODISPLAY_ROW_COUNT - 1, t1, t2);
         }
         break;
-
     }
 }
 
 
 static int process()
 {
+    struct fb_var_screeninfo fbvinfo;
+    struct fb_fix_screeninfo fbfinfo;
     DISPMANX_DISPLAY_HANDLE_T display;
     DISPMANX_MODEINFO_T display_info;
     DISPMANX_RESOURCE_HANDLE_T screen_resource;
-    VC_IMAGE_TRANSFORM_T transform;
+    //VC_IMAGE_TRANSFORM_T transform;
     uint32_t image_prt;
     VC_RECT_T rect1;
     int ret;
     int fbfd = 0;
     char *fbp = 0;
-    int vid_w, vid_h;
+
+    int frame = 0;
+    int screen_width = 0, screen_height = 0;
+    int video_enabled = 0;
+    int vid_w = 0, vid_h = 0;
+    INFODISPLAY *infodisplay = NULL;
+    INPUT_CTX *inputctx = NULL;
 
 
     bcm_host_init();
@@ -237,9 +251,9 @@ static int process()
 
     memset(fbp, 0, fbfinfo.smem_len);
 
-    //s_width = fbvinfo.xres;
-    s_width = fbfinfo.line_length / (fbvinfo.bits_per_pixel / 8);
-    s_height = fbvinfo.yres;
+    //screen_width = fbvinfo.xres;
+    screen_width = fbfinfo.line_length / (fbvinfo.bits_per_pixel / 8);
+    screen_height = fbvinfo.yres;
 
     inputctx = input_create(fileno(stdin));
 
@@ -248,7 +262,7 @@ static int process()
     {
         if (s_ttf_filename == NULL)
             s_ttf_filename = TTF_DEFAULT_FILENAME;
-        infodisplay = infodisplay_create(s_width, s_height - vid_h,
+        infodisplay = infodisplay_create(screen_width, screen_height,
                                          fbvinfo.red.offset, fbvinfo.red.length,
                                          fbvinfo.green.offset, fbvinfo.green.length,
                                          fbvinfo.blue.offset, fbvinfo.blue.length,
@@ -267,11 +281,13 @@ static int process()
         int need_to_refresh_display = 0;
         const int LINESIZE = 256;
         char line[LINESIZE];
-        int x, y, read_status;
 
-        ret = vc_dispmanx_snapshot(display, screen_resource, 0);
-        vc_dispmanx_resource_read_data(screen_resource, &rect1, fbp,
-                                       fbvinfo.xres * fbvinfo.bits_per_pixel / 8);
+        if (video_enabled)
+        {
+            ret = vc_dispmanx_snapshot(display, screen_resource, 0);
+            vc_dispmanx_resource_read_data(screen_resource, &rect1, fbp,
+                                           fbvinfo.xres * fbvinfo.bits_per_pixel / 8);
+        }
 
         if (inputctx != NULL)
         {
@@ -288,7 +304,7 @@ static int process()
                 {
                     dbg_printf("Line: %s\n", line);
 
-                    line_to_infodisplay(infodisplay, line);
+                    translate_input_line(infodisplay, &video_enabled, line);
                     need_to_refresh_display = 1;
                     try_read_more = 1;
                 }
@@ -297,25 +313,37 @@ static int process()
 
         if (infodisplay != NULL && need_to_refresh_display)
         {
-            /*
-            // hardcoded infodisplay update test:
-            infodisplay_set_progress(infodisplay, (float)s_frame * 40 / (1*60*1000+32*1000+100) );
-            infodisplay_set_textrow(infodisplay, 0, "xx_zz_nnn_r720P.mp4");
-            infodisplay_set_status(infodisplay, INFODISPLAY_ICON_PLAYING);
-            infodisplay_set_times(infodisplay, s_frame * 40,
-                                  345*60*60*1000 + 45*60*1000+32*1000+100);
-            */
+            //// hardcoded infodisplay update test:
+            //infodisplay_set_progress(infodisplay, (float)frame * 40 / (1*60*1000+32*1000+100) );
+            //infodisplay_set_row_text(infodisplay, 5, "xx_zz_nnn_r720P.mp4");
+            //infodisplay_set_row_icon(infodisplay, 6, INFODISPLAY_ICON_PLAYING);
+            //infodisplay_set_row_times(infodisplay, 6, frame * 40,
+            //                          345*60*60*1000 + 45*60*1000+32*1000+100);
+
             infodisplay_update(infodisplay);
-            // update infodisplay backbuffer to bottom part of the screen
-            memcpy(fbp + vid_h * fbfinfo.line_length,
-                   infodisplay->backbuf, infodisplay->backbuf_size);
+
+            if (video_enabled)
+            {
+                // update infodisplay backbuffer to bottom part of the screen
+                // (upper part is cloned video preview)
+                int start_byte_offset = vid_h * fbfinfo.line_length;
+                memcpy((char *)fbp + start_byte_offset,
+                       (char *)infodisplay->backbuf + start_byte_offset,
+                       infodisplay->backbuf_size - start_byte_offset);
+            } else {
+                // update infodisplay to whole screen
+                // (cloned video preview is disabled)
+                memcpy((void *)fbp, (void *)infodisplay->backbuf,
+                       infodisplay->backbuf_size);
+            }
         }
 
         usleep(SLEEP_MILLISECONDS_PER_FRAME * 1000);
-        ++s_frame;
+        ++frame;
     }
 
     infodisplay_close(infodisplay);
+    input_close(inputctx);
 
     memset(fbp, 0, fbfinfo.smem_len);
 

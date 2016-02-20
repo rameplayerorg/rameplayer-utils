@@ -5,6 +5,8 @@ pkg_check_modules(FT freetype2)
 
 SET(COMPILE_DEFINITIONS -Werror -Wall -O3)
 
+add_definitions(${COMPILE_DEFINITIONS})
+
 include_directories(${FT_INCLUDE_DIRS})
 
 include_directories(/opt/vc/include)

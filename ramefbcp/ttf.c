@@ -241,26 +241,6 @@ static int TTF_byteswapped = 0;
     }
 
 
-static void TTF_initLineMectrics(const TTF_Font *font, const TTF_Surface *textbuf, const int row, Uint8 **pdst, int *pheight)
-{
-    Uint8 *dst;
-    int height;
-
-    dst = (Uint8 *)textbuf->pixels;
-    if ( row > 0 ) {
-        dst += row * textbuf->pitch;
-    }
-
-    height = font->underline_height;
-    /* Take outline into account */
-    if ( font->outline > 0 ) {
-        height += font->outline * 2;
-    }
-    *pdst = dst;
-    *pheight = height;
-}
-
-
 static void TTF_SetFTError(const char *msg, FT_Error error)
 {
 #ifdef USE_FREETYPE_ERRORS
@@ -967,7 +947,8 @@ static Uint32 UTF8_getch(const char **src, size_t *srclen)
 {
     const Uint8 *p = *(const Uint8**)src;
     size_t left = 0;
-    SDL_bool overlong = SDL_FALSE;
+    // commented out overlong-related code as it's not used for now
+    //SDL_bool overlong = SDL_FALSE;
     SDL_bool underflow = SDL_FALSE;
     Uint32 ch = UNKNOWN_UNICODE;
 
@@ -976,41 +957,41 @@ static Uint32 UTF8_getch(const char **src, size_t *srclen)
     }
     if (p[0] >= 0xFC) {
         if ((p[0] & 0xFE) == 0xFC) {
-            if (p[0] == 0xFC && (p[1] & 0xFC) == 0x80) {
-                overlong = SDL_TRUE;
-            }
+            //if (p[0] == 0xFC && (p[1] & 0xFC) == 0x80) {
+            //    overlong = SDL_TRUE;
+            //}
             ch = (Uint32) (p[0] & 0x01);
             left = 5;
         }
     } else if (p[0] >= 0xF8) {
         if ((p[0] & 0xFC) == 0xF8) {
-            if (p[0] == 0xF8 && (p[1] & 0xF8) == 0x80) {
-                overlong = SDL_TRUE;
-            }
+            //if (p[0] == 0xF8 && (p[1] & 0xF8) == 0x80) {
+            //    overlong = SDL_TRUE;
+            //}
             ch = (Uint32) (p[0] & 0x03);
             left = 4;
         }
     } else if (p[0] >= 0xF0) {
         if ((p[0] & 0xF8) == 0xF0) {
-            if (p[0] == 0xF0 && (p[1] & 0xF0) == 0x80) {
-                overlong = SDL_TRUE;
-            }
+            //if (p[0] == 0xF0 && (p[1] & 0xF0) == 0x80) {
+            //    overlong = SDL_TRUE;
+            //}
             ch = (Uint32) (p[0] & 0x07);
             left = 3;
         }
     } else if (p[0] >= 0xE0) {
         if ((p[0] & 0xF0) == 0xE0) {
-            if (p[0] == 0xE0 && (p[1] & 0xE0) == 0x80) {
-                overlong = SDL_TRUE;
-            }
+            //if (p[0] == 0xE0 && (p[1] & 0xE0) == 0x80) {
+            //    overlong = SDL_TRUE;
+            //}
             ch = (Uint32) (p[0] & 0x0F);
             left = 2;
         }
     } else if (p[0] >= 0xC0) {
         if ((p[0] & 0xE0) == 0xC0) {
-            if ((p[0] & 0xDE) == 0xC0) {
-                overlong = SDL_TRUE;
-            }
+            //if ((p[0] & 0xDE) == 0xC0) {
+            //    overlong = SDL_TRUE;
+            //}
             ch = (Uint32) (p[0] & 0x1F);
             left = 1;
         }
@@ -1506,10 +1487,6 @@ TTF_Surface *TTF_RenderUTF8_Shaded(TTF_Font *font, const char *text)
     int width;
     int height;
     TTF_Surface* textbuf;
-    int index;
-    //int rdiff;
-    //int gdiff;
-    //int bdiff;
     Uint8* src;
     Uint8* dst;
     Uint8* dst_check;
@@ -1631,10 +1608,6 @@ void TTF_RenderUTF8_Shaded_Surface(TTF_Surface *dest,
     //int width;
     //int height;
     TTF_Surface* textbuf = dest;
-    int index;
-    //int rdiff;
-    //int gdiff;
-    //int bdiff;
     Uint8* src;
     Uint8* dst;
     Uint8* dst_check;
