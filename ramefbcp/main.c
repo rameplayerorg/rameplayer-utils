@@ -17,7 +17,7 @@
 
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 1
-#define VERSION_PATCH 0
+#define VERSION_PATCH 1
 
 #define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
 
@@ -31,6 +31,8 @@
 static int s_alive = 1;
 
 static const char *s_ttf_filename = NULL;
+
+static INFODISPLAY_ICON s_current_status = INFODISPLAY_ICON_NONE;
 
 
 static void print_fb_info(struct fb_var_screeninfo *vinfo, struct fb_fix_screeninfo *finfo)
@@ -122,9 +124,12 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
                 value = line[2] - '0';
             if (value >= INFODISPLAY_ICON_NONE &&
                 value < INFODISPLAY_ICON_COUNT)
+            {
+                s_current_status = (INFODISPLAY_ICON)value;
                 infodisplay_set_row_icon(infodisplay,
                                          INFODISPLAY_ROW_COUNT - 1,
                                          (INFODISPLAY_ICON)value);
+            }
         }
         break;
 
@@ -309,6 +314,13 @@ static int process()
                     try_read_more = 1;
                 }
             } while (try_read_more);
+        }
+
+        // always refresh display when we're in a state with animated icon:
+        if (s_current_status == INFODISPLAY_ICON_BUFFERING ||
+            s_current_status == INFODISPLAY_ICON_WAITING)
+        {
+            need_to_refresh_display = 1;
         }
 
         if (infodisplay != NULL && need_to_refresh_display)

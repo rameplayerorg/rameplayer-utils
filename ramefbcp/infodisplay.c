@@ -7,17 +7,20 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
 #include "infodisplay.h"
 #include "icon-data.h"
 #include "ttf.h"
 #include "debug.h"
 
 
-static const int infodisplay_icon_text_horiz_gap = 1;
+static const int infodisplay_icon_text_horiz_gap = 2;
 static const int infodisplay_progress_bar_height = 2;
 
 static const unsigned long play_bar_color_32 = 0xfff12b24;
 static const unsigned short play_bar_color_16_565 = 0xf144;
+
+static const int animation_cycle_length_ms = 1000;
 
 
 // TODO: Implement proper clipping, now there's just some rudimentary check for rect size but dx,dy must stay within screen
@@ -353,13 +356,29 @@ static void draw_progress(INFODISPLAY *disp, int progress_bar_y)
 }
 
 
+static time_t s_start_time_sec = 0;
+
 // renders the current display state to the backbuffer (disp->backbuf)
 void infodisplay_update(INFODISPLAY *disp)
 {
     int y, progress_bar_y = 0;
+    struct timeval tv;
+    int anim_time_ms = 0;
 
     if (disp == NULL || disp->backbuf == NULL)
         return;
+
+    if (gettimeofday(&tv, NULL) == 0)
+    {
+        // anim_time_ms is meant for overall tracking of passing time for very
+        // simple animation (starts & periodically restarts from 0)
+        if (s_start_time_sec == 0 ||
+            (tv.tv_sec - s_start_time_sec) > 24 * 60 * 60) // rough reset once per day
+        {
+            s_start_time_sec = tv.tv_sec;
+        }
+        anim_time_ms = (tv.tv_sec - s_start_time_sec) * 1000 + tv.tv_usec / 1000;
+    }
 
     memset(disp->backbuf, 0, disp->backbuf_size);
 
@@ -385,9 +404,15 @@ void infodisplay_update(INFODISPLAY *disp)
             else if (disp->info_row_icon[row] == INFODISPLAY_ICON_STOPPED)
                 icon = icon_stopped;
             else if (disp->info_row_icon[row] == INFODISPLAY_ICON_BUFFERING)
-                icon = icon_buffering; // TODO: animated buffering icon
+            {
+                int anim_frame = anim_time_ms * ICON_BUFFERING_FRAMES / animation_cycle_length_ms;
+                icon = icon_buffering[anim_frame % ICON_BUFFERING_FRAMES];
+            }
             else if (disp->info_row_icon[row] == INFODISPLAY_ICON_WAITING)
-                icon = icon_waiting; // TODO: animated waiting icon
+            {
+                int anim_frame = anim_time_ms * ICON_WAITING_FRAMES / animation_cycle_length_ms;
+                icon = icon_waiting[anim_frame % ICON_WAITING_FRAMES];
+            }
             if (icon != NULL)
             {
                 int icon_y = y + (disp->row_height - ICON_HEIGHT) / 2;
