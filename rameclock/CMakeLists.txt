@@ -7,5 +7,5 @@ link_directories(/opt/vc/lib)
 include_directories(../librameutil)
 
 add_executable(rameclock clock.c)
-target_link_libraries(rameclock rameutil bcm_host EGL GLESv2)
+target_link_libraries(rameclock rameutil bcm_host EGL GLESv2 mosquitto)
 install(TARGETS rameclock DESTINATION bin)

@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <wchar.h>
+#include <mosquitto.h>
+#include <string.h>
 
 #include "VG/openvg.h"
 #include "VG/vgu.h"
@@ -96,6 +98,7 @@ static const VGfloat rgba_white[4]  = { 1.0, 1.0, 1.0, 1.0 };
 static const VGfloat rgba_red[4]    = { 1.0,   0,   0, 1.0 };
 static const VGfloat rgba_black[4]  = {   0,   0,   0, 1.0 };
 static const VGfloat rgba_silver[4] = { 0.3, 0.3, 0.3, 1.0 };
+static const VGfloat rgba_alert[4]  = { 1.0,   0,   0, 0.4 };
 
 static VGImage load_ppm(const char *filename, int *logo_w, int *logo_h)
 {
@@ -134,11 +137,9 @@ err:
 
 #define TIME_BUF_SIZE 9
 
-static void update_time(struct tm *tm, wchar_t *buf) {
-	struct timeval tv;
-
-	gettimeofday(&tv, 0);
-	localtime_r(&tv.tv_sec, tm);
+static void update_time(struct timeval *tv, struct tm *tm, wchar_t *buf) {
+	gettimeofday(tv, 0);
+	localtime_r(&tv->tv_sec, tm);
 
 	//tm->tm_hour = 7;
 	//tm->tm_min = 20;
@@ -146,10 +147,19 @@ static void update_time(struct tm *tm, wchar_t *buf) {
 	wcsftime(buf, TIME_BUF_SIZE, L"%T", tm);
 }
 
+static void on_connect(struct mosquitto *mosq, void *data, int status) {
+	if (!status) mosquitto_subscribe(mosq, NULL, "rame/clock/alert", 1);
+}
+
+static void on_message(struct mosquitto *mosq, void *data, const struct mosquitto_message *msg) {
+	if (msg->payloadlen) memcpy(data, msg->payload, 1);
+}
+
 int main(int argc, char **argv)
 {
-	float fps = 5.0;
+	float fps = 25.0;
 	state_t state = {0}, *s = &state;
+	struct timeval tv;
 	struct tm tm;
 	int i;
 
@@ -168,8 +178,14 @@ int main(int argc, char **argv)
 	VGfloat digital_w;
 	VGfloat digital_h = 0;
 
+	struct mosquitto *mosq = NULL;
+	time_t last_reconn_attempt = 0;
+	char alert_state = 0;
+	VGPaint alert_paint;
+
 	int opt;
 	static const struct option long_options[] = {
+		{"broker", required_argument, NULL, 'b'},
 		{"display", required_argument, NULL, 'd'},
 		{"logo", required_argument, NULL, 'l'},
 		{NULL, 0, NULL, 0}
@@ -178,8 +194,18 @@ int main(int argc, char **argv)
 	bcm_host_init();
 	init_egl(s);
 
-	while ((opt = getopt_long(argc, argv, "d:l:", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "b:d:l:", long_options, NULL)) != -1) {
 		switch (opt) {
+		case 'b':
+			alert_paint = create_paint(rgba_alert);
+
+			mosquitto_lib_init();
+			mosq = mosquitto_new(NULL, true, &alert_state);
+			mosquitto_connect_callback_set(mosq, on_connect);
+			mosquitto_message_callback_set(mosq, on_message);
+			mosquitto_connect(mosq, optarg, 1883, 60);
+
+			break;
 		case 'd':
 			if (!strcmp(optarg, "combined")) digital = 1;
 			else if (!strcmp(optarg, "digital")) {
@@ -207,7 +233,7 @@ int main(int argc, char **argv)
 
 	if (digital) {
 		font = font_load_default(s);
-		update_time(&tm, time_buf);
+		update_time(&tv, &tm, time_buf);
 		font_get_text_extent(font, time_buf, &digital_w, &digital_h);
 	}
 
@@ -238,12 +264,35 @@ int main(int argc, char **argv)
 	}
 
 	while (1) {
+		update_time(&tv, &tm, time_buf);
+
+		if (mosq && mosquitto_loop(mosq, 0, 1) && tv.tv_sec - last_reconn_attempt > 15) {
+			alert_state = 0;
+			mosquitto_reconnect_async(mosq);
+			last_reconn_attempt = tv.tv_sec;
+		}
+
 		/* clear */
 		vgLoadIdentity();
 		vgSetPaint(gradient_paint, VG_FILL_PATH);
 		vgDrawPath(background_rect, VG_STROKE_PATH | VG_FILL_PATH);
 
-		update_time(&tm, time_buf);
+		/* logo */
+		if (analog && logo != VG_INVALID_HANDLE) {
+			vgSeti(VG_MATRIX_MODE, VG_MATRIX_IMAGE_USER_TO_SURFACE);
+			vgLoadIdentity();
+			vgTranslate(s->screen_width / 2, digital_h + analog_h / 4);
+			vgScale(0.3, 0.3);
+			vgTranslate(-logo_w/2, -logo_h/2);
+			vgDrawImage(logo);
+			vgSeti(VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE);
+		}
+
+		if (alert_state && (alert_state == 1 || tv.tv_usec >= 500000)) {
+			vgLoadIdentity();
+			vgSetPaint(alert_paint, VG_FILL_PATH);
+			vgDrawPath(background_rect, VG_STROKE_PATH | VG_FILL_PATH);
+		}
 
 		if (analog) {
 			/* clock face */
@@ -261,17 +310,6 @@ int main(int argc, char **argv)
 					vgDrawPath(small_tick, VG_FILL_PATH);
 				}
 				vgRotate(360/60.0);
-			}
-
-			/* logo */
-			if (logo != VG_INVALID_HANDLE) {
-				vgSeti(VG_MATRIX_MODE, VG_MATRIX_IMAGE_USER_TO_SURFACE);
-				vgLoadIdentity();
-				vgTranslate(s->screen_width / 2, digital_h + analog_h / 4);
-				vgScale(0.3, 0.3);
-				vgTranslate(-logo_w/2, -logo_h/2);
-				vgDrawImage(logo);
-				vgSeti(VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE);
 			}
 
 			vgSetf(VG_STROKE_LINE_WIDTH, 0.008);
