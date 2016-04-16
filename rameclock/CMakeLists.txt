@@ -8,4 +8,8 @@ include_directories(../librameutil)
 
 add_executable(rameclock clock.c)
 target_link_libraries(rameclock rameutil bcm_host EGL GLESv2 mosquitto)
-install(TARGETS rameclock DESTINATION bin)
+
+add_executable(rameclock-button button.c)
+target_link_libraries(rameclock-button mosquitto)
+
+install(TARGETS rameclock rameclock-button DESTINATION bin)
