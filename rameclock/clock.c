@@ -1,123 +1,14 @@
+#include "rameutil.h"
+
 #include <time.h>
-#include <stdio.h>
-#include <unistd.h>
 #include <assert.h>
 #include <sys/time.h>
 
 #include "VG/openvg.h"
 #include "VG/vgu.h"
-#include "VG/vgext.h"
 #include "EGL/egl.h"
 #include "GLES/gl.h"
 #include "bcm_host.h"
-
-typedef struct {
-	uint32_t screen_width;
-	uint32_t screen_height;
-	EGLDisplay display;
-	EGLSurface surface;
-	EGLContext context;
-	VGfloat normalized_screen[9];
-} state_t;
-
-static void init_egl(state_t *s)
-{
-	static EGL_DISPMANX_WINDOW_T nativewindow;
-	static const EGLint attribute_list[] = {
-		EGL_RED_SIZE, 8,
-		EGL_GREEN_SIZE, 8,
-		EGL_BLUE_SIZE, 8,
-		EGL_ALPHA_SIZE, 8,
-		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-		EGL_NONE
-	};
-
-	int32_t success = 0;
-	EGLBoolean result;
-	EGLint num_config;
-	DISPMANX_ELEMENT_HANDLE_T dispman_element;
-	DISPMANX_DISPLAY_HANDLE_T dispman_display;
-	DISPMANX_UPDATE_HANDLE_T dispman_update;
-	VC_RECT_T dst_rect;
-	VC_RECT_T src_rect;
-	EGLConfig config;
-
-	// get an EGL display connection
-	s->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-	assert(s->display != EGL_NO_DISPLAY);
-
-	// initialize the EGL display connection
-	result = eglInitialize(s->display, NULL, NULL);
-	assert(EGL_FALSE != result);
-
-	// bind OpenVG API
-	eglBindAPI(EGL_OPENVG_API);
-
-	// get an appropriate EGL frame buffer configuration
-	result = eglChooseConfig(s->display, attribute_list, &config, 1, &num_config);
-	assert(EGL_FALSE != result);
-
-	// create an EGL rendering context
-	s->context = eglCreateContext(s->display, config, EGL_NO_CONTEXT, NULL);
-	assert(s->context != EGL_NO_CONTEXT);
-
-	// create an EGL window surface
-	success = graphics_get_display_size(0 /* LCD */ , &s->screen_width,
-					    &s->screen_height);
-	assert(success >= 0);
-
-	dst_rect.x = 0;
-	dst_rect.y = 0;
-	dst_rect.width = s->screen_width;
-	dst_rect.height = s->screen_height;
-
-	src_rect.x = 0;
-	src_rect.y = 0;
-	src_rect.width = s->screen_width << 16;
-	src_rect.height = s->screen_height << 16;
-
-	dispman_display = vc_dispmanx_display_open(0 /* LCD */ );
-	dispman_update = vc_dispmanx_update_start(0);
-
-	dispman_element = vc_dispmanx_element_add(dispman_update, dispman_display, 0 /*layer */ , &dst_rect, 0 /*src */ ,
-						  &src_rect, DISPMANX_PROTECTION_NONE, 0 /*alpha */ , 0 /*clamp */ ,
-						  0 /*transform */ );
-
-	nativewindow.element = dispman_element;
-	nativewindow.width = s->screen_width;
-	nativewindow.height = s->screen_height;
-	vc_dispmanx_update_submit_sync(dispman_update);
-
-	s->surface = eglCreateWindowSurface(s->display, config, &nativewindow, NULL);
-	assert(s->surface != EGL_NO_SURFACE);
-
-	// preserve the buffers on swap
-	result = eglSurfaceAttrib(s->display, s->surface, EGL_SWAP_BEHAVIOR, EGL_BUFFER_PRESERVED);
-	assert(EGL_FALSE != result);
-
-	// connect the context to the surface
-	result = eglMakeCurrent(s->display, s->surface, s->surface, s->context);
-	assert(EGL_FALSE != result);
-
-	// set up screen ratio
-	glViewport(0, 0, (GLsizei) s->screen_width, (GLsizei) s->screen_height);
-
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-
-	float ratio = (float)s->screen_width / (float)s->screen_height;
-	glFrustumf(-ratio, ratio, -1.0f, 1.0f, 1.0f, 10.0f);
-}
-
-void fini_egl(state_t *s)
-{
-	glClear(GL_COLOR_BUFFER_BIT);
-	eglSwapBuffers(s->display, s->surface);
-	eglMakeCurrent(s->display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-	eglDestroySurface(s->display, s->surface);
-	eglDestroyContext(s->display, s->context);
-	eglTerminate(s->display);
-}
 
 static VGPaint create_paint(const VGfloat rgba[4])
 {
@@ -252,6 +143,16 @@ int main(int argc, char **argv)
 
 	bcm_host_init();
 	init_egl(s);
+
+	// set up screen ratio
+	glViewport(0, 0, (GLsizei) s->screen_width, (GLsizei) s->screen_height);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+
+	float ratio = (float)s->screen_width / (float)s->screen_height;
+	glFrustumf(-ratio, ratio, -1.0f, 1.0f, 1.0f, 10.0f);
+
 	size = s->screen_height < s->screen_width ? s->screen_height : s->screen_width;
 
 	/* create standard translation (center screen) */
