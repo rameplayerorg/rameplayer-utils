@@ -178,6 +178,10 @@ fontdata_t *font_load(state_t *s, const char *filename, int face_index)
 	return f;
 }
 
+fontdata_t *font_load_default(state_t *s) {
+	return font_load(s, "/usr/share/fonts/TTF/FreeSerif.ttf", 0);
+}
+
 void font_unload(fontdata_t *f)
 {
 	int i;

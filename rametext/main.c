@@ -37,7 +37,7 @@ static void draw(state_t *s, const char *text)
 	size_t n;
 	int i;
 
-	f = font_load(s, "/usr/share/fonts/TTF/FreeSerif.ttf", 0);
+	f = font_load_default(s);
 	vgClear(0, 0, s->screen_width, s->screen_height);
 
 	setfill(white);
