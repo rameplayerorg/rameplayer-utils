@@ -3,6 +3,9 @@
 #include <time.h>
 #include <assert.h>
 #include <sys/time.h>
+#include <unistd.h>
+#include <getopt.h>
+#include <wchar.h>
 
 #include "VG/openvg.h"
 #include "VG/vgu.h"
@@ -129,20 +132,65 @@ err:
 	return image;
 }
 
+#define TIME_BUF_SIZE 9
+
+static void update_time(struct tm *tm, wchar_t *buf) {
+	struct timeval tv;
+
+	gettimeofday(&tv, 0);
+	localtime_r(&tv.tv_sec, tm);
+
+	//tm->tm_hour = 7;
+	//tm->tm_min = 20;
+
+	wcsftime(buf, TIME_BUF_SIZE, L"%T", tm);
+}
+
 int main(int argc, char **argv)
 {
 	float fps = 5.0;
 	state_t state = {0}, *s = &state;
-	struct timeval tv;
 	struct tm tm;
-	int i, size, logo_w, logo_h;
+	int i;
 
+	VGPath background_rect;
+	VGPaint black_paint, gradient_paint;
+
+	int analog = 1;
+	int analog_size, analog_h, logo_w, logo_h;
 	VGImage logo = VG_INVALID_HANDLE;
-	VGPath mega_tick, big_tick, small_tick, hour_hand, minute_hand, second_hand, background_rect;
-	VGPaint black_paint, red_paint, silver_paint, gradient_paint;
+	VGPath mega_tick, big_tick, small_tick, hour_hand, minute_hand, second_hand;
+	VGPaint red_paint, silver_paint;
+
+	int digital = 0;
+	fontdata_t *font;
+	wchar_t time_buf[TIME_BUF_SIZE];
+	VGfloat digital_w;
+	VGfloat digital_h = 0;
+
+	int opt;
+	static const struct option long_options[] = {
+		{"display", required_argument, NULL, 'd'},
+		{"logo", required_argument, NULL, 'l'},
+		{NULL, 0, NULL, 0}
+	};
 
 	bcm_host_init();
 	init_egl(s);
+
+	while ((opt = getopt_long(argc, argv, "d:l:", long_options, NULL)) != -1) {
+		switch (opt) {
+		case 'd':
+			if (!strcmp(optarg, "combined")) digital = 1;
+			else if (!strcmp(optarg, "digital")) {
+				analog = 0;
+				digital = 1;
+			}
+			break;
+		case 'l':
+			logo = load_ppm(optarg, &logo_w, &logo_h);
+		}
+	}
 
 	// set up screen ratio
 	glViewport(0, 0, (GLsizei) s->screen_width, (GLsizei) s->screen_height);
@@ -153,34 +201,41 @@ int main(int argc, char **argv)
 	float ratio = (float)s->screen_width / (float)s->screen_height;
 	glFrustumf(-ratio, ratio, -1.0f, 1.0f, 1.0f, 10.0f);
 
-	size = s->screen_height < s->screen_width ? s->screen_height : s->screen_width;
-
-	/* create standard translation (center screen) */
-	vgTranslate(s->screen_width / 2.0, s->screen_height / 2.0);
-	vgScale(size / 2.0, size / 2.0);
-	vgGetMatrix(s->normalized_screen);
-
-	vgSeti(VG_STROKE_CAP_STYLE, VG_CAP_BUTT);
-	vgSeti(VG_STROKE_JOIN_STYLE, VG_JOIN_MITER);
-
-	if (argc > 1)
-		logo = load_ppm(argv[1], &logo_w, &logo_h);
-
 	gradient_paint = create_gradient_paint(s);
 	black_paint = create_paint(rgba_black);
-	silver_paint = create_paint(rgba_silver);
-	red_paint = create_paint(rgba_red);
-
-	mega_tick = create_tick(.71, .91, 0.04);
-	big_tick = create_tick(.8, .9, 0.04);
-	small_tick = create_tick(.825, .875, 0.01);
-
-	hour_hand = create_big_hand(0.5);
-	minute_hand = create_big_hand(0.9);
-	second_hand = create_small_hand(0.95);
 	background_rect = create_rect(0, 0, s->screen_width, s->screen_height);
 
-	assert(vgGetError() == VG_NO_ERROR);
+	if (digital) {
+		font = font_load_default(s);
+		update_time(&tm, time_buf);
+		font_get_text_extent(font, time_buf, &digital_w, &digital_h);
+	}
+
+	if (analog) {
+		analog_h = s->screen_height - digital_h;
+		analog_size = analog_h < s->screen_width ? analog_h : s->screen_width;
+
+		/* create standard translation (center screen) */
+		vgTranslate(s->screen_width / 2.0, digital_h + analog_h / 2.0);
+		vgScale(analog_size / 2.0, analog_size / 2.0);
+		vgGetMatrix(s->normalized_screen);
+
+		vgSeti(VG_STROKE_CAP_STYLE, VG_CAP_BUTT);
+		vgSeti(VG_STROKE_JOIN_STYLE, VG_JOIN_MITER);
+
+		silver_paint = create_paint(rgba_silver);
+		red_paint = create_paint(rgba_red);
+
+		mega_tick = create_tick(.71, .91, 0.04);
+		big_tick = create_tick(.8, .9, 0.04);
+		small_tick = create_tick(.825, .875, 0.01);
+
+		hour_hand = create_big_hand(0.5);
+		minute_hand = create_big_hand(0.9);
+		second_hand = create_small_hand(0.95);
+
+		assert(vgGetError() == VG_NO_ERROR);
+	}
 
 	while (1) {
 		/* clear */
@@ -188,60 +243,62 @@ int main(int argc, char **argv)
 		vgSetPaint(gradient_paint, VG_FILL_PATH);
 		vgDrawPath(background_rect, VG_STROKE_PATH | VG_FILL_PATH);
 
-		/* clock face */
-		vgLoadMatrix(s->normalized_screen);
-		vgSetPaint(black_paint, VG_FILL_PATH);
-		//vgSetPaint(black_paint, VG_STROKE_PATH);
-		vgSetPaint(silver_paint, VG_STROKE_PATH);
-		vgSetf(VG_STROKE_LINE_WIDTH, 0.008);
-		for (i = 0; i < 60; i++) {
-			if (i % 15 == 0) {
-				vgDrawPath(mega_tick, VG_FILL_PATH | VG_STROKE_PATH);
-			} else if (i % 5 == 0) {
-				vgDrawPath(big_tick, VG_FILL_PATH);
-			} else {
-				vgDrawPath(small_tick, VG_FILL_PATH);
+		update_time(&tm, time_buf);
+
+		if (analog) {
+			/* clock face */
+			vgLoadMatrix(s->normalized_screen);
+			vgSetPaint(black_paint, VG_FILL_PATH);
+			//vgSetPaint(black_paint, VG_STROKE_PATH);
+			vgSetPaint(silver_paint, VG_STROKE_PATH);
+			vgSetf(VG_STROKE_LINE_WIDTH, 0.008);
+			for (i = 0; i < 60; i++) {
+				if (i % 15 == 0) {
+					vgDrawPath(mega_tick, VG_FILL_PATH | VG_STROKE_PATH);
+				} else if (i % 5 == 0) {
+					vgDrawPath(big_tick, VG_FILL_PATH);
+				} else {
+					vgDrawPath(small_tick, VG_FILL_PATH);
+				}
+				vgRotate(360/60.0);
 			}
-			vgRotate(360/60.0);
+
+			/* logo */
+			if (logo != VG_INVALID_HANDLE) {
+				vgSeti(VG_MATRIX_MODE, VG_MATRIX_IMAGE_USER_TO_SURFACE);
+				vgLoadIdentity();
+				vgTranslate(s->screen_width / 2, digital_h + analog_h / 4);
+				vgScale(0.3, 0.3);
+				vgTranslate(-logo_w/2, -logo_h/2);
+				vgDrawImage(logo);
+				vgSeti(VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE);
+			}
+
+			vgSetf(VG_STROKE_LINE_WIDTH, 0.008);
+			vgSetPaint(silver_paint, VG_STROKE_PATH);
+			vgSetPaint(black_paint, VG_FILL_PATH);
+
+			vgLoadMatrix(s->normalized_screen);
+			vgRotate(-360.0/12.0 * (tm.tm_min/60.0 + tm.tm_hour));
+			vgDrawPath(hour_hand, VG_STROKE_PATH | VG_FILL_PATH);
+
+			vgLoadMatrix(s->normalized_screen);
+			vgRotate(-360.0/60.0 * (tm.tm_sec/60.0 + tm.tm_min));
+			vgDrawPath(minute_hand, VG_STROKE_PATH | VG_FILL_PATH);
+
+			vgSetPaint(red_paint, VG_STROKE_PATH);
+			vgSetPaint(red_paint, VG_FILL_PATH);
+			vgSetf(VG_STROKE_LINE_WIDTH, 0.01);
+			vgLoadMatrix(s->normalized_screen);
+			vgRotate(-360.0/60.0 * tm.tm_sec);
+			vgDrawPath(second_hand, VG_STROKE_PATH | VG_FILL_PATH);
 		}
 
-		/* logo */
-		if (logo != VG_INVALID_HANDLE) {
-			vgSeti(VG_MATRIX_MODE, VG_MATRIX_IMAGE_USER_TO_SURFACE);
-			vgLoadIdentity();
-			//vgTranslate(s->screen_width/2, 24*s->screen_height/32);
-			vgTranslate(s->screen_width/2, 1*s->screen_height/4);
-			vgScale(0.3, 0.3);
-			vgTranslate(-logo_w/2, -logo_h/2);
-			vgDrawImage(logo);
-			vgSeti(VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE);
+		if (digital) {
+			vgSetPaint(black_paint, VG_FILL_PATH);
+			font_get_text_extent(font, time_buf, &digital_w, &digital_h);
+			font_draw_text(font, time_buf, (s->screen_width - digital_w) / 2.0, (s->screen_height - analog_h - digital_h) / 2.0, VG_FILL_PATH);
 		}
-
-		/* time */
-		gettimeofday(&tv, 0);
-		localtime_r(&tv.tv_sec, &tm);
-
-		//tm.tm_hour = 7;
-		//tm.tm_min = 20;
-
-		vgSetf(VG_STROKE_LINE_WIDTH, 0.008);
-		vgSetPaint(silver_paint, VG_STROKE_PATH);
-		vgSetPaint(black_paint, VG_FILL_PATH);
-
-		vgLoadMatrix(s->normalized_screen);
-		vgRotate(-360.0/12.0 * (tm.tm_min/60.0 + tm.tm_hour));
-		vgDrawPath(hour_hand, VG_STROKE_PATH | VG_FILL_PATH);
-
-		vgLoadMatrix(s->normalized_screen);
-		vgRotate(-360.0/60.0 * (tm.tm_sec/60.0 + tm.tm_min));
-		vgDrawPath(minute_hand, VG_STROKE_PATH | VG_FILL_PATH);
-
-		vgSetPaint(red_paint, VG_STROKE_PATH);
-		vgSetPaint(red_paint, VG_FILL_PATH);
-		vgSetf(VG_STROKE_LINE_WIDTH, 0.01);
-		vgLoadMatrix(s->normalized_screen);
-		vgRotate(-360.0/60.0 * tm.tm_sec);
-		vgDrawPath(second_hand, VG_STROKE_PATH | VG_FILL_PATH);
 
 		assert(vgGetError() == VG_NO_ERROR);
 		eglSwapBuffers(s->display, s->surface);
