@@ -1,6 +1,7 @@
 #include "rameutil.h"
 
 #include <assert.h>
+#include <wchar.h>
 
 #include <vc_dispmanx.h>
 #include <bcm_host.h>
@@ -229,11 +230,11 @@ static void font_load_glyph(fontdata_t *f, int index)
 	vgSetGlyphToPath(f->font, index, path, 0, glyphOrigin, escapement);
 }
 
-void font_get_text_extent(fontdata_t *f, const wchar_t *text, size_t len, VGfloat *w, VGfloat *h)
+void font_get_text_extent(fontdata_t *f, const wchar_t *text, VGfloat *w, VGfloat *h)
 {
 	FT_Vector kerning;
 	VGfloat x = 0, y = 0;
-	int i, prev = 0, cur;
+	int i, prev = 0, len = wcslen(text), cur;
 
 	for (i = 0; i < len; i++) {
 		cur = FT_Get_Char_Index(f->face, text[i]);
@@ -253,13 +254,13 @@ void font_get_text_extent(fontdata_t *f, const wchar_t *text, size_t len, VGfloa
 	*h = -y;
 }
 
-void font_draw_text(fontdata_t *f, const wchar_t *text, size_t len, VGfloat x, VGfloat y, VGbitfield paint_mode)
+void font_draw_text(fontdata_t *f, const wchar_t *text, VGfloat x, VGfloat y, VGbitfield paint_mode)
 {
 	VGuint glyphs[256];
 	VGfloat adjx[256], adjy[256];
 	VGfloat origin[2] = {x, y+(f->height-f->ascender-f->descender)/2};
 	FT_Vector kerning;
-	int i, prev = 0, cur;
+	int i, prev = 0, len = wcslen(text), cur;
 
 	for (i = 0; i < len; i++) {
 		glyphs[i] = cur = FT_Get_Char_Index(f->face, text[i]);

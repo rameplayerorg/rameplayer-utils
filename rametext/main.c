@@ -45,8 +45,8 @@ static void draw(state_t *s, const char *text)
 
 	n = mbstowcs(wcs, text, sizeof wcs / sizeof wcs[0]);
 	if (n != (size_t)-1) {
-		font_get_text_extent(f, wcs, n, &w, &h);
-		font_draw_text(f, wcs, n, (s->screen_width-w)/2, (s->screen_height-h)/2, VG_FILL_PATH);
+		font_get_text_extent(f, wcs, &w, &h);
+		font_draw_text(f, wcs, (s->screen_width-w)/2, (s->screen_height-h)/2, VG_FILL_PATH);
 	}
 	font_unload(f);
 }
