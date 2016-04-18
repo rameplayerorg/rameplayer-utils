@@ -17,7 +17,7 @@
 
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 1
-#define VERSION_PATCH 1
+#define VERSION_PATCH 2
 
 #define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
 
@@ -435,7 +435,7 @@ int main(int argc, char **argv)
                        #ifdef DEBUG_SUPPORT
                        "(available)\n"
                        #else
-                       "(NOT available)\n"
+                       "(not compiled in)\n"
                        #endif
                    "  -h \t This usage info.\n");
             return EXIT_SUCCESS;

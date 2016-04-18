@@ -23,7 +23,85 @@ static const unsigned short play_bar_color_16_565 = 0xf144;
 static const int animation_cycle_length_ms = 1000;
 
 
-// TODO: Implement proper clipping, now there's just some rudimentary check for rect size but dx,dy must stay within screen
+static int mini(int a, int b)
+{
+    return a < b ? a : b;
+}
+
+static int maxi(int a, int b)
+{
+    return a > b ? a : b;
+}
+
+
+// Clipped blit from grayscale 8bpp source to 16bpp target,
+// mixing with target pixels using OR operation.
+static void blit_8_or(INFODISPLAY *disp,                        // target display
+                      int clip_top_left_x, int clip_top_left_y, // target clip rect top-left
+                      int clip_width, int clip_height,          // target clip rect size
+                      int top_left_x, int top_left_y,           // target top-left coordinate
+                      const unsigned char * restrict src,       // 8bpp grayscale source buffer
+                      int src_width, int src_height,            // source rect size
+                      int src_pitch)                            // source buffer pitch
+{
+    const int offs_r = disp->offs_r, bits_r = disp->bits_r;
+    const int offs_g = disp->offs_g, bits_g = disp->bits_g;
+    const int offs_b = disp->offs_b, bits_b = disp->bits_b;
+    const int offs_a = disp->offs_a, bits_a = disp->bits_a;
+    const int bits_lum = 8;
+    PIXEL * restrict dest = disp->backbuf;
+    const int dest_pitch = disp->width;
+
+    // clip cliprect against disp size
+    // result: top-left inclusive; bottom-right exclusive
+    int clip_left = maxi(0, clip_top_left_x);
+    int clip_top = maxi(0, clip_top_left_y);
+    int clip_right = mini(disp->width, clip_top_left_x + clip_width);
+    int clip_bottom = mini(disp->height, clip_top_left_y + clip_height);
+    if (clip_right <= clip_left || clip_bottom <= clip_top)
+        return; // empty target clip rect
+    // NB! now invalid: clip_top_left_x clip_top_left_y clip_width clip_height
+
+    // clip target pos and source size against the clip rect
+    // result: top-left inclusive; bottom-right exclusive
+    int target_left = maxi(top_left_x, clip_left);
+    int target_top = maxi(top_left_y, clip_top);
+    int target_right = mini(top_left_x + src_width, clip_right);
+    int target_bottom = mini(top_left_y + src_height, clip_bottom);
+    if (target_right <= target_left || target_bottom <= target_top)
+        return; // empty result drawing rect
+
+    // adjust source buffer offset to match clipped top-left part
+    int src_offs = 0;
+    if (target_left > top_left_x)
+        src_offs += target_left - top_left_x;
+    if (target_top > top_left_y)
+        src_offs += (target_top - top_left_y) * src_pitch;
+
+    int dest_offs = target_top * dest_pitch + target_left;
+
+    for (int y = target_top; y < target_bottom; ++y)
+    {
+        PIXEL * restrict destpx = dest + dest_offs;
+        const unsigned char * restrict srcpx = src + src_offs;
+        for (int x = target_left; x < target_right; ++x)
+        {
+            PIXEL pix = 0;
+            const unsigned char lum = *srcpx;
+            pix |= (lum >> (bits_lum - bits_r)) << offs_r;
+            pix |= (lum >> (bits_lum - bits_g)) << offs_g;
+            pix |= (lum >> (bits_lum - bits_b)) << offs_b;
+            pix |= (0xff >> (8 - bits_a)) << offs_a;
+            *destpx |= pix;
+            ++destpx;
+            ++srcpx;
+        }
+        dest_offs += dest_pitch;
+        src_offs += src_pitch;
+    }
+}
+
+
 static void draw_text(INFODISPLAY *disp, int dx, int dy, char *text)
 {
     int width, height;
@@ -41,8 +119,8 @@ static void draw_text(INFODISPLAY *disp, int dx, int dy, char *text)
         // reallocate larger work area, using max width&height of earlier and new
         if (disp->textsurf != NULL)
         {
-            width = disp->textsurf->w > width ? disp->textsurf->w : width;
-            height = disp->textsurf->h > height ? disp->textsurf->h : height;
+            width = maxi(disp->textsurf->w, width);
+            height = maxi(disp->textsurf->h, height);
         }
         TTF_FreeSurface(disp->textsurf);
         disp->textsurf = TTF_CreateSurface(width, height);
@@ -57,78 +135,19 @@ static void draw_text(INFODISPLAY *disp, int dx, int dy, char *text)
     TTF_RenderUTF8_Shaded_Surface(disp->textsurf, disp->font, text);
     TTF_Surface *surf = disp->textsurf;
 
-    const int offs_r = disp->offs_r, bits_r = disp->bits_r;
-    const int offs_g = disp->offs_g, bits_g = disp->bits_g;
-    const int offs_b = disp->offs_b, bits_b = disp->bits_b;
-    const int offs_a = disp->offs_a, bits_a = disp->bits_a;
-    const int bits_lum = 8;
-    PIXEL * restrict dest = disp->backbuf;
-    const char * restrict src = (const char *)surf->pixels;
-
-    // TODO: proper clipping
-    if (dx + width > disp->width)
-        width -= dx + width - disp->width;
-    if (dy + height > disp->height)
-        height -= dy + height - disp->height;
-
-    const int src_w = width, src_h = height;
-
-    int src_row_offs = 0;
-    int dest_row_offs = dy * disp->width;
-    
-    for (int y = 0; y < src_h; ++y)
-    {
-        int dest_offs = dest_row_offs + dx;
-        int src_offs = src_row_offs;
-        for (int x = 0; x < src_w; ++x)
-        {
-            PIXEL16 pix = 0;
-            const unsigned char lum = src[src_offs];
-            pix |= (lum >> (bits_lum - bits_r)) << offs_r;
-            pix |= (lum >> (bits_lum - bits_g)) << offs_g;
-            pix |= (lum >> (bits_lum - bits_b)) << offs_b;
-            pix |= (0xff >> (8 - bits_a)) << offs_a;
-            dest[dest_offs] |= pix;
-            ++dest_offs;
-            ++src_offs;
-        }
-        dest_row_offs += disp->width;
-        src_row_offs += surf->pitch;
-    }
+    blit_8_or(disp, 0, 0, disp->width, disp->height,     // target & clip rect
+              dx, dy,                                    // target pos
+              surf->pixels, width, height, surf->pitch); // src data, size and pitch
 }
 
 
-// Hacky hardcoded way to draw icons defined in 8bpp arrays.
-// Warning: No clipping!
+// Custom icon drawing (from 8bpp grayscale to 16bpp destination buffer).
 // Note: No support for fb_var_screeninfo rgb msb_right!=0.
 static void draw_icon(INFODISPLAY *disp, int dx, int dy, unsigned char *icon)
 {
-    const int offs_r = disp->offs_r, bits_r = disp->bits_r;
-    const int offs_g = disp->offs_g, bits_g = disp->bits_g;
-    const int offs_b = disp->offs_b, bits_b = disp->bits_b;
-    const int offs_a = disp->offs_a, bits_a = disp->bits_a;
-    const int bits_lum = 8;
-    PIXEL * restrict backbuf = disp->backbuf;
-
-    int src_offs = 0;
-    int dest_row_offs = dy * disp->width;
-    for (int y = 0; y < ICON_HEIGHT; ++y)
-    {
-        int dest_offs = dest_row_offs + dx;
-        for (int x = 0; x < ICON_WIDTH; ++x)
-        {
-            PIXEL16 pix = 0;
-            const unsigned char lum = icon[src_offs];
-            pix |= (lum >> (bits_lum - bits_r)) << offs_r;
-            pix |= (lum >> (bits_lum - bits_g)) << offs_g;
-            pix |= (lum >> (bits_lum - bits_b)) << offs_b;
-            pix |= (0xff >> (8 - bits_a)) << offs_a;
-            backbuf[dest_offs] = pix;
-            ++dest_offs;
-            ++src_offs;
-        }
-        dest_row_offs += disp->width;
-    }
+    blit_8_or(disp, 0, 0, disp->width, disp->height,      // target & clip rect
+              dx, dy,                                     // target pos
+              icon, ICON_WIDTH, ICON_HEIGHT, ICON_WIDTH); // src data, size and pitch
 }
 
 

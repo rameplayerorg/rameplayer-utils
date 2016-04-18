@@ -8,7 +8,7 @@ extern "C" {
 
 
 #define PIXEL16 unsigned short
-#define PIXEL32 unsigned int
+//#define PIXEL32 unsigned int
 typedef PIXEL16 PIXEL; // hardcoded to 16bpp for now, maybe expand format support later
 
 #define INFODISPLAY_ROW_COUNT 7

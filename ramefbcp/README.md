@@ -20,8 +20,6 @@ What's shown on the screen:
 
 
 TODO:
-- animated "buffering" icon
-- implement proper clipping to infodisplay drawing
 - back and forth auto-scroll feature for too long strings
 - (support for other than 16bpp fb pixel formats?)
 
