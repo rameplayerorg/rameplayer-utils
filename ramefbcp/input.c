@@ -37,10 +37,6 @@ void input_close(INPUT_CTX *ctx)
 }
 
 
-// TODO:
-// if input contains many rows, rest of rows are pending at the
-// buffer, and input starts lagging or something
-
 /* Reads a line to dest (with max dest_size including 0 at end)
  * using ctx as the working context.
  * Return values:
