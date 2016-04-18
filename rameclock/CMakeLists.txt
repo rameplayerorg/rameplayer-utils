@@ -6,3 +6,4 @@ link_directories(/opt/vc/lib)
 
 add_executable(rameclock clock.c)
 target_link_libraries(rameclock bcm_host EGL GLESv2 ${FT_LIBRARIES})
+install(TARGETS rameclock DESTINATION bin)
