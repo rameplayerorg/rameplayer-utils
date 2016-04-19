@@ -4,8 +4,6 @@ include_directories(/opt/vc/include/interface/vmcs_host)
 include_directories(/opt/vc/include/interface/vmcs_host/linux)
 link_directories(/opt/vc/lib)
 
-include_directories(../librameutil)
-
-add_executable(rameclock clock.c)
-target_link_libraries(rameclock rameutil bcm_host EGL GLESv2)
-install(TARGETS rameclock DESTINATION bin)
+add_library(rameutil SHARED librameutil.c)
+target_link_libraries(rameutil bcm_host EGL GLESv2 ${FT_LIBRARIES})
+install(TARGETS rameutil DESTINATION lib)

@@ -16,5 +16,7 @@ include_directories(/opt/vc/include/interface/vmcs_host/linux)
 link_directories(/opt/vc/lib)
 
 add_executable(ramefbcp main.c debug.c infodisplay.c ttf.c input.c)
-
 target_link_libraries(ramefbcp bcm_host ${FT_LIBRARIES})
+
+install(TARGETS ramefbcp DESTINATION bin)
+install(FILES ramefbcp.ttf DESTINATION share/fonts/TTF)
