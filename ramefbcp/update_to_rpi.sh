@@ -1,5 +1,5 @@
 #!/bin/bash
-IP=10.0.0.16
+IP=rame
 REMOTE=root@$IP
 REMOTE_FOLDER=ramefbcp/
 TARGET=$REMOTE:$REMOTE_FOLDER
