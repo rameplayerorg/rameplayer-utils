@@ -56,6 +56,9 @@ typedef uint64_t Uint64;
 #define UNICODE_BOM_SWAPPED 0xFFFE
 
 
+static Uint16 ttf_glyph_not_found_char = '?'; // set to 0 to disable this
+
+
 #define TTF_ERRBUFSIZE 128
 
 static char ttf_errbuf[TTF_ERRBUFSIZE] = { 0 };
@@ -1183,8 +1186,16 @@ int TTF_SizeUTF8(TTF_Font *font, const char *text, int *w, int *h)
 
         error = Find_Glyph(font, c, CACHED_METRICS);
         if ( error ) {
-            TTF_SetFTError("Couldn't find glyph", error);
-            return -1;
+            if (ttf_glyph_not_found_char != 0)
+            {
+                c = ttf_glyph_not_found_char;
+                error = Find_Glyph(font, c, CACHED_METRICS);
+            }
+            // Disabled "stop on error", just skip and continue instead
+            if (error)
+                continue;
+            //TTF_SetFTError("Couldn't find glyph", error);
+            //return -1;
         }
         glyph = font->current;
 
@@ -1381,10 +1392,18 @@ TTF_Surface *TTF_RenderUTF8_Solid(TTF_Font *font,
 
         error = Find_Glyph(font, c, CACHED_METRICS|CACHED_BITMAP);
         if ( error ) {
-            TTF_SetFTError("Couldn't find glyph", error);
-            //SDL_FreeSurface( textbuf );
-            TTF_FreeSurface( textbuf );
-            return NULL;
+            if (ttf_glyph_not_found_char != 0)
+            {
+                c = ttf_glyph_not_found_char;
+                error = Find_Glyph(font, c, CACHED_METRICS|CACHED_BITMAP);
+            }
+            // Disabled "stop on error", just skip and continue instead
+            if (error)
+                continue;
+            //TTF_SetFTError("Couldn't find glyph", error);
+            ////SDL_FreeSurface( textbuf );
+            //TTF_FreeSurface( textbuf );
+            //return NULL;
         }
         glyph = font->current;
         current = &glyph->bitmap;
@@ -1532,10 +1551,18 @@ TTF_Surface *TTF_RenderUTF8_Shaded(TTF_Font *font, const char *text)
 
         error = Find_Glyph(font, c, CACHED_METRICS|CACHED_PIXMAP);
         if ( error ) {
-            TTF_SetFTError("Couldn't find glyph", error);
-            //SDL_FreeSurface( textbuf );
-            TTF_FreeSurface( textbuf );
-            return NULL;
+            if (ttf_glyph_not_found_char != 0)
+            {
+                c = ttf_glyph_not_found_char;
+                error = Find_Glyph(font, c, CACHED_METRICS|CACHED_PIXMAP);
+            }
+            // Disabled "stop on error", just skip and continue instead
+            if (error)
+                continue;
+            //TTF_SetFTError("Couldn't find glyph", error);
+            ////SDL_FreeSurface( textbuf );
+            //TTF_FreeSurface( textbuf );
+            //return NULL;
         }
         glyph = font->current;
         /* Ensure the width of the pixmap is correct. On some cases,
@@ -1650,8 +1677,16 @@ void TTF_RenderUTF8_Shaded_Surface(TTF_Surface *dest,
 
         error = Find_Glyph(font, c, CACHED_METRICS|CACHED_PIXMAP);
         if ( error ) {
-            TTF_SetFTError("Couldn't find glyph", error);
-            return;
+            if (ttf_glyph_not_found_char != 0)
+            {
+                c = ttf_glyph_not_found_char;
+                error = Find_Glyph(font, c, CACHED_METRICS|CACHED_PIXMAP);
+            }
+            // Disabled "stop on error", just skip and continue instead
+            if (error)
+                continue;
+            //TTF_SetFTError("Couldn't find glyph", error);
+            //return;
         }
         glyph = font->current;
         /* Ensure the width of the pixmap is correct. On some cases,
