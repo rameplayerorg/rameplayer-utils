@@ -42,12 +42,13 @@ typedef struct _INFODISPLAY
     unsigned char offs_r, bits_r, offs_g, bits_g, offs_b, bits_b, offs_a, bits_a;
     TTF_Font *font;
     float info_progress; // progress bar length, [0..1]
-    int anim_time_ms; // overall animation time in milliseconds
+    int prev_anim_time_ms; // prev.animation time in milliseconds
     char *info_rows[INFODISPLAY_ROW_COUNT]; // text row contents
     int info_row_mem[INFODISPLAY_ROW_COUNT]; // amount of bytes per row allocated
     INFODISPLAY_ICON info_row_icon[INFODISPLAY_ROW_COUNT]; // icon state for each row
     TTF_Surface *info_row_textsurf[INFODISPLAY_ROW_COUNT]; // cached rendered texts
     float info_row_scroll_time_s[INFODISPLAY_ROW_COUNT]; // row scroll times in seconds
+    int info_row_text_width[INFODISPLAY_ROW_COUNT]; // cached text width
 } INFODISPLAY;
 
 

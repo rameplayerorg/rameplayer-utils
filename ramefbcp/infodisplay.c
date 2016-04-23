@@ -24,7 +24,8 @@ static const unsigned short play_bar_color_16_565 = 0xf144;
 static const int animation_cycle_length_ms = 1000;
 
 static const float scroll_speed_pix_per_s = 20.0f;
-static const float scroll_endpoint_delay_s = 1.5f;
+static const float scroll_startpoint_delay_s = 1.0f;
+static const float scroll_endpoint_delay_s = 2.0f;
 
 
 static int mini(int a, int b)
@@ -143,6 +144,7 @@ static void blit_8_or(INFODISPLAY *disp,                        // target displa
 }
 
 
+/*
 static int get_text_size(INFODISPLAY *disp, const char *text,
                          int *width, int *height)
 {
@@ -153,20 +155,25 @@ static int get_text_size(INFODISPLAY *disp, const char *text,
         return -1;
     return TTF_SizeUTF8(disp->font, text, width, height);
 }
+*/
 
-
-static void draw_text_cliprect(INFODISPLAY *disp, int info_row, int dx, int dy,
-                               const char *text,
-                               int clip_top_left_x, int clip_top_left_y,
-                               int clip_width, int clip_height)
+static void draw_text_to_row_textsurf(INFODISPLAY *disp, int info_row,
+                                      const char *text)
 {
     int width, height;
 
+    if (disp == NULL)
+        return; // error
     if (text == NULL || text[0] == 0)
         return; // skip null or empty input text
 
-    if (TTF_SizeUTF8(disp->font, text, &width, &height) < 0 || width == 0 || height == 0)
+    disp->info_row_text_width[info_row] = 0;
+
+    if (TTF_SizeUTF8(disp->font, text, &width, &height) < 0
+        || width == 0 || height == 0)
+    {
         return; // empty result
+    }
 
     if (disp->info_row_textsurf[info_row] == NULL ||
         disp->info_row_textsurf[info_row]->w < width ||
@@ -180,7 +187,6 @@ static void draw_text_cliprect(INFODISPLAY *disp, int info_row, int dx, int dy,
         }
         TTF_FreeSurface(disp->info_row_textsurf[info_row]);
         disp->info_row_textsurf[info_row] = TTF_CreateSurface(width, height);
-        //printf("allocated text surface: %d,%d,%d\n", disp->info_row_textsurf[info_row]->w, disp->info_row_textsurf[info_row]->h, disp->info_row_textsurf[info_row]->pitch);
     }
     else
         TTF_ClearSurface(disp->info_row_textsurf[info_row]);
@@ -189,22 +195,22 @@ static void draw_text_cliprect(INFODISPLAY *disp, int info_row, int dx, int dy,
         return; // error
 
     TTF_RenderUTF8_Shaded_Surface(disp->info_row_textsurf[info_row], disp->font, text);
-    TTF_Surface *surf = disp->info_row_textsurf[info_row];
+    disp->info_row_text_width[info_row] = width;
+}
 
+static void blit_row_textsurf(INFODISPLAY *disp, int info_row, int dx, int dy,
+                              int clip_top_left_x, int clip_top_left_y,
+                              int clip_width, int clip_height)
+{
+    if (disp == NULL || disp->info_row_textsurf[info_row] == NULL)
+        return; // error
+    TTF_Surface *surf = disp->info_row_textsurf[info_row];
+    int width = surf->w, height = surf->h;
     blit_8_or(disp,                                      // target & clip rect:
               clip_top_left_x, clip_top_left_y, clip_width, clip_height,
               dx, dy,                                    // target pos
               surf->pixels, width, height, surf->pitch); // src data, size and pitch
 }
-
-/*
-static void draw_text(INFODISPLAY *disp, int info_row, int dx, int dy,
-                      const char *text)
-{
-    draw_text_cliprect(disp, info_row, dx, dy, text,
-                       0, 0, disp->width, disp->height);
-}
-*/
 
 
 // Custom icon drawing (from 8bpp grayscale to 16bpp destination buffer).
@@ -361,6 +367,11 @@ void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text)
         strncpy(disp->info_rows[row], text, disp->info_row_mem[row]);
         disp->info_rows[row][disp->info_row_mem[row] - 1] = 0;
         disp->info_row_scroll_time_s[row] = 0;
+
+        draw_text_to_row_textsurf(disp, row, disp->info_rows[row]);
+
+        // after moving rendering here, we technically wouldn't need to store
+        // the string itself anymore. (but it's kept in the struct for now)
     }
 }
 
@@ -478,7 +489,7 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
 
     if (gettimeofday(&tv, NULL) == 0)
     {
-        int prev_anim_time_ms = disp->anim_time_ms;
+        int prev_anim_time_ms = disp->prev_anim_time_ms;
         // anim_time_ms is meant for overall tracking of passing time for very
         // simple animation (starts & periodically restarts from 0)
         if (s_start_time_sec == 0 ||
@@ -488,9 +499,16 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
             prev_anim_time_ms = 0;
         }
         anim_time_ms = (tv.tv_sec - s_start_time_sec) * 1000 + tv.tv_usec / 1000;
-        disp->anim_time_ms = anim_time_ms;
+        if (prev_anim_time_ms == 0)
+        {
+            // prev_anim_time_ms is set to 0 either above,
+            // or when not requesting constant refresh (and needs
+            // to be set to 0, otherwise it falls too much behind)
+            prev_anim_time_ms = anim_time_ms;
+        }
         int anim_time_delta_ms = anim_time_ms - prev_anim_time_ms;
         anim_time_delta_s = anim_time_delta_ms / 1000.0f;
+        disp->prev_anim_time_ms = anim_time_ms;
     }
 
     memset(disp->backbuf, 0, disp->backbuf_size);
@@ -538,31 +556,37 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
 
         if (disp->info_rows[row] != NULL)
         {
-            const char *text = disp->info_rows[row];
+            //const char *text = disp->info_rows[row];
             int rem_horiz_space = disp->width - x;
-            int tx = x, ty = y, tw, th; // scrolling text pos and size
-            if (get_text_size(disp, text, &tw, &th) == 0)
+            int tx = x, ty = y, tw; // scrolling text pos and width
+            tw = disp->info_row_text_width[row];
+
+            if (tw > 0)
             {
+                //int th = mini(disp->info_row_textsurf[row]->h, disp->row_height);
+
                 if (tw > rem_horiz_space)
                 {
                     float anim_time_s = disp->info_row_scroll_time_s[row];
                     int scroll_length_pix = tw - rem_horiz_space;
                     float scroll_length_s = scroll_length_pix / scroll_speed_pix_per_s;
-                    float period_length_s = 2.0f * (scroll_length_s + scroll_endpoint_delay_s);
+                    float period_length_s = 2.0f * scroll_length_s +
+                        scroll_startpoint_delay_s + scroll_endpoint_delay_s;
                     float scroll_time_s = fmodf(anim_time_s, period_length_s);
                     // v Period:      
                     // |     _c_      .
                     // |    /   \     .
                     // |_a_/b   d\    .
                     // +------------t .
-                    // a,c = endpoint delay
-                    //   b = scroll forwards
-                    //   d = scroll backwards
+                    // a = startpoint delay
+                    // b = scroll forwards
+                    // c = endpoint delay
+                    // d = scroll backwards
                     // uss = start of scroll forwards slope b (end of a)
                     // use = end of scroll forwards slope b (start of c)
                     // dss = start of scroll backwards slope d (end of c)
                     // dse = end of scroll backdwards slope d (start of a, wrap)
-                    float scroll_uss = scroll_endpoint_delay_s;
+                    float scroll_uss = scroll_startpoint_delay_s;
                     float scroll_use = scroll_uss + scroll_length_s;
                     float scroll_dss = scroll_use + scroll_endpoint_delay_s;
                     float scroll_dse = scroll_dss + scroll_length_s;
@@ -574,20 +598,20 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
                     disp->info_row_scroll_time_s[row] += anim_time_delta_s;
                     req_refresh = 1; // scrolling row, need constant refresh
                 }
-            }
+                
+                blit_row_textsurf(disp, row, tx, ty,     // target, row #, text pos
+                                  x, y, rem_horiz_space, disp->row_height); // clip rect
+            } // tw > 0
+        } // text on row != NULL
 
-            // TODO: move text drawing from here to set_row_text
-            //       (only use cached pixmap here)
-            //       - each row already has its own text surface for that change
-
-            draw_text_cliprect(disp, row, tx, ty, text, // target, row #, text pos, text
-                               x, y, rem_horiz_space, disp->row_height); // clip rect
-        }
         y += disp->row_height;
     }
 
     if (disp->info_progress > 0)
         draw_progress(disp, progress_bar_y);
+
+    if (!req_refresh)
+        disp->prev_anim_time_ms = 0; // reset anim time delta (unknown time until next refresh)
 
     if (ret_req != NULL)
         *ret_req |= req_refresh;
