@@ -41,11 +41,13 @@ typedef struct _INFODISPLAY
     // rgba offset & bit width inside pixels:
     unsigned char offs_r, bits_r, offs_g, bits_g, offs_b, bits_b, offs_a, bits_a;
     TTF_Font *font;
-    TTF_Surface *textsurf; // text rendering work area
     float info_progress; // progress bar length, [0..1]
+    int anim_time_ms; // overall animation time in milliseconds
     char *info_rows[INFODISPLAY_ROW_COUNT]; // text row contents
     int info_row_mem[INFODISPLAY_ROW_COUNT]; // amount of bytes per row allocated
     INFODISPLAY_ICON info_row_icon[INFODISPLAY_ROW_COUNT]; // icon state for each row
+    TTF_Surface *info_row_textsurf[INFODISPLAY_ROW_COUNT]; // cached rendered texts
+    float info_row_scroll_time_s[INFODISPLAY_ROW_COUNT]; // row scroll times in seconds
 } INFODISPLAY;
 
 
@@ -63,12 +65,16 @@ extern void infodisplay_close(INFODISPLAY *disp);
 extern void infodisplay_set_progress(INFODISPLAY *disp, float progress);
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
 extern void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text);
+// reset scroll position of row
+extern void infodisplay_reset_row_scroll(INFODISPLAY *disp, int row);
 // sets row icon
 extern void infodisplay_set_row_icon(INFODISPLAY *disp, int row, INFODISPLAY_ICON icon);
 // shorthand for formatting given row to given times in [h:]mm:ss.0 / [h:]mm:ss.0 format
 extern void infodisplay_set_row_times(INFODISPLAY *disp, int row, int time1_ms, int time2_ms);
-// renders the current display state to the backbuffer (disp->backbuf)
-extern void infodisplay_update(INFODISPLAY *disp);
+// Renders the current display state to the backbuffer (disp->backbuf).
+// If ret_req!=NULL, writes value to it where non-zero value means request for
+// new refresh on next available frame (instead of waiting for outside event).
+extern void infodisplay_update(INFODISPLAY *disp, int *ret_req);
 
 #ifdef __cplusplus
 }

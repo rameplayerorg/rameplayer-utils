@@ -16,8 +16,8 @@
 
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 1
-#define VERSION_PATCH 2
+#define VERSION_MINOR 2
+#define VERSION_PATCH 0
 
 #define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
 
@@ -96,12 +96,15 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
     {
         case 'X':
         {
-            // text to row number [1..INFODISPLAY_ROW_COUNT].
+            // text to row number [1..INFODISPLAY_ROW_COUNT], max 9 rows.
             // e.g. "X1:Please wait..."
             int rown = line[1] - '1';
             if (rown >= 0 && rown < INFODISPLAY_ROW_COUNT &&
                 line[2] == ':')
+            {
                 infodisplay_set_row_text(infodisplay, rown, &line[3]);
+                infodisplay_reset_row_scroll(infodisplay, rown);
+            }
         }
         break;
 
@@ -189,6 +192,8 @@ static int process()
     int vid_w = 0, vid_h = 0;
     INFODISPLAY *infodisplay = NULL;
     INPUT_CTX *inputctx = NULL;
+
+    int need_to_refresh_display = 0;
 
 
     bcm_host_init();
@@ -283,7 +288,7 @@ static int process()
 
     while (s_alive)
     {
-        int need_to_refresh_display = 0;
+        int update_req_refresh = 0;
         const int LINESIZE = 256;
         char line[LINESIZE];
 
@@ -332,7 +337,7 @@ static int process()
             //infodisplay_set_row_times(infodisplay, 6, frame * 40,
             //                          345*60*60*1000 + 45*60*1000+32*1000+100);
 
-            infodisplay_update(infodisplay);
+            infodisplay_update(infodisplay, &update_req_refresh);
 
             if (video_enabled)
             {
@@ -352,6 +357,7 @@ static int process()
 
         usleep(SLEEP_MILLISECONDS_PER_FRAME * 1000);
         ++frame;
+        need_to_refresh_display = update_req_refresh;
     }
 
     infodisplay_close(infodisplay);

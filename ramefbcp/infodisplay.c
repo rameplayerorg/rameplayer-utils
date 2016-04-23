@@ -1,4 +1,4 @@
-/* Copyright 2015 rameplayerorg
+/* Copyright 2015,2016 rameplayerorg
  * Licensed under GPLv2, which you must read from the included LICENSE file.
  *
  * Info display code for part of the LCD screen (secondary framebuffer).
@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+#include <math.h>
 #include "infodisplay.h"
 #include "icon-data.h"
 #include "ttf.h"
@@ -22,6 +23,9 @@ static const unsigned short play_bar_color_16_565 = 0xf144;
 
 static const int animation_cycle_length_ms = 1000;
 
+static const float scroll_speed_pix_per_s = 20.0f;
+static const float scroll_endpoint_delay_s = 1.5f;
+
 
 static int mini(int a, int b)
 {
@@ -32,6 +36,43 @@ static int maxi(int a, int b)
 {
     return a > b ? a : b;
 }
+
+static float minf(float a, float b)
+{
+    return a < b ? a : b;
+}
+
+static float maxf(float a, float b)
+{
+    return a > b ? a : b;
+}
+
+static float clampf(float value, float min_val, float max_val)
+{
+    return maxf(min_val, minf(value, max_val));
+}
+
+static float stepf(float value, float step_pos)
+{
+    return value < step_pos ? 0.0f : 1.0f;
+}
+
+static float boxstepf(float value, float slope_start, float slope_end)
+{
+    float diff = slope_end - slope_start;
+    if (diff == 0)
+        return stepf(value, slope_start);
+    return clampf((value - slope_start) / diff, 0.0f, 1.0f);
+}
+
+static float boxpulsef(float value,
+                       float up_slope_start, float up_slope_end,
+                       float down_slope_start, float down_slope_end)
+{
+    return boxstepf(value,   up_slope_start,   up_slope_end)
+         - boxstepf(value, down_slope_start, down_slope_end);
+}
+
 
 
 // Clipped blit from grayscale 8bpp source to 16bpp target,
@@ -102,7 +143,22 @@ static void blit_8_or(INFODISPLAY *disp,                        // target displa
 }
 
 
-static void draw_text(INFODISPLAY *disp, int dx, int dy, char *text)
+static int get_text_size(INFODISPLAY *disp, const char *text,
+                         int *width, int *height)
+{
+    if (width == NULL || height == NULL)
+        return -1;
+    *width = *height = 0;
+    if (text == NULL)
+        return -1;
+    return TTF_SizeUTF8(disp->font, text, width, height);
+}
+
+
+static void draw_text_cliprect(INFODISPLAY *disp, int info_row, int dx, int dy,
+                               const char *text,
+                               int clip_top_left_x, int clip_top_left_y,
+                               int clip_width, int clip_height)
 {
     int width, height;
 
@@ -112,33 +168,43 @@ static void draw_text(INFODISPLAY *disp, int dx, int dy, char *text)
     if (TTF_SizeUTF8(disp->font, text, &width, &height) < 0 || width == 0 || height == 0)
         return; // empty result
 
-    if (disp->textsurf == NULL ||
-        disp->textsurf->w < width ||
-        disp->textsurf->h < height)
+    if (disp->info_row_textsurf[info_row] == NULL ||
+        disp->info_row_textsurf[info_row]->w < width ||
+        disp->info_row_textsurf[info_row]->h < height)
     {
         // reallocate larger work area, using max width&height of earlier and new
-        if (disp->textsurf != NULL)
+        if (disp->info_row_textsurf[info_row] != NULL)
         {
-            width = maxi(disp->textsurf->w, width);
-            height = maxi(disp->textsurf->h, height);
+            width = maxi(disp->info_row_textsurf[info_row]->w, width);
+            height = maxi(disp->info_row_textsurf[info_row]->h, height);
         }
-        TTF_FreeSurface(disp->textsurf);
-        disp->textsurf = TTF_CreateSurface(width, height);
-        //printf("allocated text surface: %d,%d,%d\n", disp->textsurf->w, disp->textsurf->h, disp->textsurf->pitch);
+        TTF_FreeSurface(disp->info_row_textsurf[info_row]);
+        disp->info_row_textsurf[info_row] = TTF_CreateSurface(width, height);
+        //printf("allocated text surface: %d,%d,%d\n", disp->info_row_textsurf[info_row]->w, disp->info_row_textsurf[info_row]->h, disp->info_row_textsurf[info_row]->pitch);
     }
     else
-        TTF_ClearSurface(disp->textsurf);
+        TTF_ClearSurface(disp->info_row_textsurf[info_row]);
 
-    if (disp->textsurf == NULL)
+    if (disp->info_row_textsurf[info_row] == NULL)
         return; // error
 
-    TTF_RenderUTF8_Shaded_Surface(disp->textsurf, disp->font, text);
-    TTF_Surface *surf = disp->textsurf;
+    TTF_RenderUTF8_Shaded_Surface(disp->info_row_textsurf[info_row], disp->font, text);
+    TTF_Surface *surf = disp->info_row_textsurf[info_row];
 
-    blit_8_or(disp, 0, 0, disp->width, disp->height,     // target & clip rect
+    blit_8_or(disp,                                      // target & clip rect:
+              clip_top_left_x, clip_top_left_y, clip_width, clip_height,
               dx, dy,                                    // target pos
               surf->pixels, width, height, surf->pitch); // src data, size and pitch
 }
+
+/*
+static void draw_text(INFODISPLAY *disp, int info_row, int dx, int dy,
+                      const char *text)
+{
+    draw_text_cliprect(disp, info_row, dx, dy, text,
+                       0, 0, disp->width, disp->height);
+}
+*/
 
 
 // Custom icon drawing (from 8bpp grayscale to 16bpp destination buffer).
@@ -244,10 +310,12 @@ void infodisplay_close(INFODISPLAY *disp)
         return;
     if (disp->font != NULL)
         TTF_CloseFont(disp->font);
-    TTF_FreeSurface(disp->textsurf);
     free(disp->backbuf);
     for (int a = 0; a < INFODISPLAY_ROW_COUNT; ++a)
+    {
         free(disp->info_rows[a]);
+        TTF_FreeSurface(disp->info_row_textsurf[a]);
+    }
     memset(disp, 0, sizeof(INFODISPLAY));
     free(disp);
 }
@@ -292,7 +360,21 @@ void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text)
     {
         strncpy(disp->info_rows[row], text, disp->info_row_mem[row]);
         disp->info_rows[row][disp->info_row_mem[row] - 1] = 0;
+        disp->info_row_scroll_time_s[row] = 0;
     }
+}
+
+// reset scroll position of row
+void infodisplay_reset_row_scroll(INFODISPLAY *disp, int row)
+{
+    if (row < 0 || row >= INFODISPLAY_ROW_COUNT)
+    {
+        #ifdef DEBUG_SUPPORT
+        dbg_printf("infodisplay_reset_row_scroll: Invalid row number %d\n", row);
+        #endif
+        return;
+    }
+    disp->info_row_scroll_time_s[row] = 0;
 }
 
 // sets row icon
@@ -377,26 +459,38 @@ static void draw_progress(INFODISPLAY *disp, int progress_bar_y)
 
 static time_t s_start_time_sec = 0;
 
-// renders the current display state to the backbuffer (disp->backbuf)
-void infodisplay_update(INFODISPLAY *disp)
+// Renders the current display state to the backbuffer (disp->backbuf).
+// If ret_req!=NULL, writes value to it where non-zero value means request for
+// new refresh on next available frame (instead of waiting for outside event).
+void infodisplay_update(INFODISPLAY *disp, int *ret_req)
 {
     int y, progress_bar_y = 0;
     struct timeval tv;
     int anim_time_ms = 0;
+    int req_refresh = 0;
+    float anim_time_delta_s = 0;
+
+    if (ret_req != NULL)
+        *ret_req = 0;
 
     if (disp == NULL || disp->backbuf == NULL)
         return;
 
     if (gettimeofday(&tv, NULL) == 0)
     {
+        int prev_anim_time_ms = disp->anim_time_ms;
         // anim_time_ms is meant for overall tracking of passing time for very
         // simple animation (starts & periodically restarts from 0)
         if (s_start_time_sec == 0 ||
             (tv.tv_sec - s_start_time_sec) > 24 * 60 * 60) // rough reset once per day
         {
             s_start_time_sec = tv.tv_sec;
+            prev_anim_time_ms = 0;
         }
         anim_time_ms = (tv.tv_sec - s_start_time_sec) * 1000 + tv.tv_usec / 1000;
+        disp->anim_time_ms = anim_time_ms;
+        int anim_time_delta_ms = anim_time_ms - prev_anim_time_ms;
+        anim_time_delta_s = anim_time_delta_ms / 1000.0f;
     }
 
     memset(disp->backbuf, 0, disp->backbuf_size);
@@ -444,12 +538,57 @@ void infodisplay_update(INFODISPLAY *disp)
 
         if (disp->info_rows[row] != NULL)
         {
-            //printf("%d: %s\n", row, disp->info_rows[row]);
-            draw_text(disp, x, y, disp->info_rows[row]);
+            const char *text = disp->info_rows[row];
+            int rem_horiz_space = disp->width - x;
+            int tx = x, ty = y, tw, th; // scrolling text pos and size
+            if (get_text_size(disp, text, &tw, &th) == 0)
+            {
+                if (tw > rem_horiz_space)
+                {
+                    float anim_time_s = disp->info_row_scroll_time_s[row];
+                    int scroll_length_pix = tw - rem_horiz_space;
+                    float scroll_length_s = scroll_length_pix / scroll_speed_pix_per_s;
+                    float period_length_s = 2.0f * (scroll_length_s + scroll_endpoint_delay_s);
+                    float scroll_time_s = fmodf(anim_time_s, period_length_s);
+                    // v Period:      
+                    // |     _c_      .
+                    // |    /   \     .
+                    // |_a_/b   d\    .
+                    // +------------t .
+                    // a,c = endpoint delay
+                    //   b = scroll forwards
+                    //   d = scroll backwards
+                    // uss = start of scroll forwards slope b (end of a)
+                    // use = end of scroll forwards slope b (start of c)
+                    // dss = start of scroll backwards slope d (end of c)
+                    // dse = end of scroll backdwards slope d (start of a, wrap)
+                    float scroll_uss = scroll_endpoint_delay_s;
+                    float scroll_use = scroll_uss + scroll_length_s;
+                    float scroll_dss = scroll_use + scroll_endpoint_delay_s;
+                    float scroll_dse = scroll_dss + scroll_length_s;
+                    float scroll_val = boxpulsef(scroll_time_s,
+                                                 scroll_uss, scroll_use,
+                                                 scroll_dss, scroll_dse);
+                    tx = (int)(x - scroll_val * scroll_length_pix);
+
+                    disp->info_row_scroll_time_s[row] += anim_time_delta_s;
+                    req_refresh = 1; // scrolling row, need constant refresh
+                }
+            }
+
+            // TODO: move text drawing from here to set_row_text
+            //       (only use cached pixmap here)
+            //       - each row already has its own text surface for that change
+
+            draw_text_cliprect(disp, row, tx, ty, text, // target, row #, text pos, text
+                               x, y, rem_horiz_space, disp->row_height); // clip rect
         }
         y += disp->row_height;
     }
 
     if (disp->info_progress > 0)
         draw_progress(disp, progress_bar_y);
+
+    if (ret_req != NULL)
+        *ret_req |= req_refresh;
 }

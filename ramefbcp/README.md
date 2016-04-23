@@ -17,11 +17,11 @@ What's shown on the screen:
   - Hostname
   - "Restart Pending..." info
   - ...
+* Too long text rows are auto-scrolled back and forth automatically
 
 
 TODO:
-- back and forth auto-scroll feature for too long strings
-- (support for other than 16bpp fb pixel formats?)
+- (support for other than 16bpp fb pixel formats - if needed?)
 
 
 
