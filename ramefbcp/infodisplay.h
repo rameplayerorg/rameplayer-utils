@@ -27,6 +27,13 @@ typedef enum INFODISPLAY_ICON_ENUM
     INFODISPLAY_ICON_COUNT //
 } INFODISPLAY_ICON;
 
+typedef enum INFODISPLAY_ROW_TYPE_ENUM
+{
+    INFODISPLAY_ROW_TYPE_TEXT = 0,
+    INFODISPLAY_ROW_TYPE_CLOCK,
+    INFODISPLAY_ROW_TYPE_COUNT //
+} INFODISPLAY_ROW_TYPE;
+    
 typedef struct _TTF_Font TTF_Font;
 typedef struct _TTF_Surface TTF_Surface;
 
@@ -43,6 +50,7 @@ typedef struct _INFODISPLAY
     TTF_Font *font;
     float info_progress; // progress bar length, [0..1]
     int prev_anim_time_ms; // prev.animation time in milliseconds
+    INFODISPLAY_ROW_TYPE info_row_type[INFODISPLAY_ROW_COUNT]; // row type
     char *info_rows[INFODISPLAY_ROW_COUNT]; // text row contents
     int info_row_mem[INFODISPLAY_ROW_COUNT]; // amount of bytes per row allocated
     INFODISPLAY_ICON info_row_icon[INFODISPLAY_ROW_COUNT]; // icon state for each row
@@ -66,6 +74,8 @@ extern void infodisplay_close(INFODISPLAY *disp);
 extern void infodisplay_set_progress(INFODISPLAY *disp, float progress);
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
 extern void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text);
+// row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
+extern void infodisplay_set_row_clock(INFODISPLAY *disp, int row, const char *text);
 // reset scroll position of row
 extern void infodisplay_reset_row_scroll(INFODISPLAY *disp, int row);
 // sets row icon

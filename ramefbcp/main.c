@@ -17,7 +17,7 @@
 
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 2
-#define VERSION_PATCH 1
+#define VERSION_PATCH 2
 
 #define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
 
@@ -104,6 +104,19 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
             {
                 infodisplay_set_row_text(infodisplay, rown, &line[3]);
                 infodisplay_reset_row_scroll(infodisplay, rown);
+            }
+        }
+        break;
+
+        case 'C':
+        {
+            // cfg row to display automatically updated local time, with prefix text
+            // e.g. "C3:UTC+0200 "
+            int rown = line[1] - '1';
+            if (rown >= 0 && rown < INFODISPLAY_ROW_COUNT &&
+                line[2] == ':')
+            {
+                infodisplay_set_row_clock(infodisplay, rown, &line[3]);
             }
         }
         break;

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <sys/time.h>
 #include <math.h>
 #include "infodisplay.h"
@@ -373,6 +374,26 @@ void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text)
         // after moving rendering here, we technically wouldn't need to store
         // the string itself anymore. (but it's kept in the struct for now)
     }
+
+    disp->info_row_type[row] = INFODISPLAY_ROW_TYPE_TEXT;
+}
+
+// row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
+void infodisplay_set_row_clock(INFODISPLAY *disp, int row, const char *text)
+{
+    #ifdef DEBUG_SUPPORT
+    if (row < 0 || row >= INFODISPLAY_ROW_COUNT)
+    {
+        dbg_printf("infodisplay_set_row_clock: Invalid row number %d\n", row);
+        return;
+    }
+    #endif
+
+    if (disp->info_row_type[row] != INFODISPLAY_ROW_TYPE_CLOCK)
+        infodisplay_reset_row_scroll(disp, row);
+
+    infodisplay_set_row_text(disp, row, text);
+    disp->info_row_type[row] = INFODISPLAY_ROW_TYPE_CLOCK;
 }
 
 // reset scroll position of row
@@ -556,7 +577,24 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
 
         if (disp->info_rows[row] != NULL)
         {
-            //const char *text = disp->info_rows[row];
+            int scroll_enabled = 1;
+
+            if (disp->info_row_type[row] == INFODISPLAY_ROW_TYPE_CLOCK)
+            {
+                // always update text row surface for clock rows
+                const char *prefix = disp->info_rows[row];
+                time_t caltime;
+                struct tm *tm_info;
+                char tmp[32];
+                time(&caltime);
+                tm_info = localtime(&caltime);
+                snprintf(tmp, 32, "%s%02d:%02d:%02d", prefix,
+                         tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec);
+                draw_text_to_row_textsurf(disp, row, tmp);
+                scroll_enabled = 0; // scrolling is not supported for clock rows
+                req_refresh = 1; // TODO: more fine-grained refresh req (scheduled time)
+            }
+
             int rem_horiz_space = disp->width - x;
             int tx = x, ty = y, tw; // scrolling text pos and width
             tw = disp->info_row_text_width[row];
@@ -565,7 +603,7 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
             {
                 //int th = mini(disp->info_row_textsurf[row]->h, disp->row_height);
 
-                if (tw > rem_horiz_space)
+                if (scroll_enabled && tw > rem_horiz_space)
                 {
                     float anim_time_s = disp->info_row_scroll_time_s[row];
                     int scroll_length_pix = tw - rem_horiz_space;
