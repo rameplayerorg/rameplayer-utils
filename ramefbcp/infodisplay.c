@@ -161,19 +161,28 @@ static int get_text_size(INFODISPLAY *disp, const char *text,
 static void draw_text_to_row_textsurf(INFODISPLAY *disp, int info_row,
                                       const char *text)
 {
-    int width, height;
+    int width, height, size_res;
 
     if (disp == NULL)
         return; // error
-    if (text == NULL || text[0] == 0)
-        return; // skip null or empty input text
+    if (text == NULL)
+    {
+        #ifdef DEBUG_SUPPORT
+        dbg_printf("draw_text_to_row_textsurf: null text!\n");
+        #endif
+        disp->info_row_text_width[info_row] = 0;
+        return; // skip null
+    }
 
     disp->info_row_text_width[info_row] = 0;
 
-    if (TTF_SizeUTF8(disp->font, text, &width, &height) < 0
-        || width == 0 || height == 0)
+    size_res = TTF_SizeUTF8(disp->font, text, &width, &height);
+    if (size_res < 0)
     {
-        return; // empty result
+        #ifdef DEBUG_SUPPORT
+        dbg_printf("draw_text_to_row_textsurf: TTF_SizeUTF8 res %d\n", size_res);
+        #endif
+        return; // error
     }
 
     if (disp->info_row_textsurf[info_row] == NULL ||
@@ -193,10 +202,28 @@ static void draw_text_to_row_textsurf(INFODISPLAY *disp, int info_row,
         TTF_ClearSurface(disp->info_row_textsurf[info_row]);
 
     if (disp->info_row_textsurf[info_row] == NULL)
+    {
+        #ifdef DEBUG_SUPPORT
+        dbg_printf("draw_text_to_row_textsurf: info_row_textsurf[%d] is NULL\n", info_row);
+        #endif
         return; // error
+    }
+
+    disp->info_row_text_width[info_row] = width;
+
+    if (width == 0 || height == 0)
+    {
+        #ifdef DEBUG_SUPPORT
+        dbg_printf("draw_text_to_row_textsurf: empty result\n");
+        #endif
+        return; // empty result
+    }
+
+#ifdef DEBUG_SUPPORT
+    dbg_printf("draw_text_to_row_textsurf: '%s'\n", text);
+#endif
 
     TTF_RenderUTF8_Shaded_Surface(disp->info_row_textsurf[info_row], disp->font, text);
-    disp->info_row_text_width[info_row] = width;
 }
 
 static void blit_row_textsurf(INFODISPLAY *disp, int info_row, int dx, int dy,
@@ -376,6 +403,11 @@ void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text)
     }
 
     disp->info_row_type[row] = INFODISPLAY_ROW_TYPE_TEXT;
+
+    #ifdef DEBUG_SUPPORT
+    dbg_printf("infodisplay_set_row_text: '%s', width %d\n",
+               disp->info_rows[row], disp->info_row_text_width[row]);
+    #endif
 }
 
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
@@ -636,9 +668,10 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
                     disp->info_row_scroll_time_s[row] += anim_time_delta_s;
                     req_refresh = 1; // scrolling row, need constant refresh
                 }
-                
+
+                int draw_width = mini(rem_horiz_space, tw);
                 blit_row_textsurf(disp, row, tx, ty,     // target, row #, text pos
-                                  x, y, rem_horiz_space, disp->row_height); // clip rect
+                                  x, y, draw_width, disp->row_height); // clip rect
             } // tw > 0
         } // text on row != NULL
 
