@@ -17,7 +17,7 @@
 
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 2
-#define VERSION_PATCH 2
+#define VERSION_PATCH 3
 
 #define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
 
@@ -90,6 +90,27 @@ static void print_fb_info(struct fb_var_screeninfo *vinfo, struct fb_fix_screeni
 }
 
 
+static unsigned long parse_hex_color(const char *str)
+{
+    unsigned long result = 0;
+    for (int a = 0; a < 8; ++a, ++str)
+    {
+        char ch = *str;
+        if (ch == 0)
+            break;
+        int nibble = 0;
+        if (ch >= '0' && ch <= '9')
+            nibble = ch - '0';
+        else if (ch >= 'a' && ch <= 'f')
+            nibble = ch - 'a' + 10;
+        else if (ch >= 'A' && ch <= 'F')
+            nibble = ch - 'A' + 10;
+        result = (result << 4) | nibble;
+    }
+    return result;
+}
+
+
 static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, const char *line)
 {
     switch (line[0])
@@ -104,6 +125,21 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
             {
                 infodisplay_set_row_text(infodisplay, rown, &line[3]);
                 infodisplay_reset_row_scroll(infodisplay, rown);
+            }
+        }
+        break;
+
+        case 'O':
+        {
+            // set text tint color for the row, AARRGGBB hex value
+            // (AA=alpha is not currently used though)
+            // e.g. "O3:FF005500" for dark green
+            int rown = line[1] - '1';
+            if (rown >= 0 && rown < INFODISPLAY_ROW_COUNT &&
+                line[2] == ':' && strlen(&line[3]) >= 6)
+            {
+                unsigned long color = parse_hex_color(&line[3]);
+                infodisplay_set_row_color(infodisplay, rown, color);
             }
         }
         break;

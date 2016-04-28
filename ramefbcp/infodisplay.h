@@ -57,6 +57,7 @@ typedef struct _INFODISPLAY
     TTF_Surface *info_row_textsurf[INFODISPLAY_ROW_COUNT]; // cached rendered texts
     float info_row_scroll_time_s[INFODISPLAY_ROW_COUNT]; // row scroll times in seconds
     int info_row_text_width[INFODISPLAY_ROW_COUNT]; // cached text width
+    unsigned long info_row_color[INFODISPLAY_ROW_COUNT]; // color for each row
 } INFODISPLAY;
 
 
@@ -72,6 +73,8 @@ extern void infodisplay_close(INFODISPLAY *disp);
 
 // progress=[0..1]
 extern void infodisplay_set_progress(INFODISPLAY *disp, float progress);
+// row=[0..INFODISPLAY_ROW_COUNT[, color as 0xAARRGGBB (AA not used for now)
+extern void infodisplay_set_row_color(INFODISPLAY *disp, int row, unsigned long color);
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
 extern void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text);
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8

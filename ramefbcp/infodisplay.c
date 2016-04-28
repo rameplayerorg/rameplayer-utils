@@ -77,21 +77,27 @@ static float boxpulsef(float value,
 
 
 
-// Clipped blit from grayscale 8bpp source to 16bpp target,
-// mixing with target pixels using OR operation.
+// Clipped and color tinted blit from grayscale 8bpp source to 16bpp target,
+// mixing with target pixels using OR operation (no actual alpha blending).
 static void blit_8_or(INFODISPLAY *disp,                        // target display
                       int clip_top_left_x, int clip_top_left_y, // target clip rect top-left
                       int clip_width, int clip_height,          // target clip rect size
                       int top_left_x, int top_left_y,           // target top-left coordinate
                       const unsigned char * restrict src,       // 8bpp grayscale source buffer
                       int src_width, int src_height,            // source rect size
-                      int src_pitch)                            // source buffer pitch
+                      int src_pitch,                            // source buffer pitch
+                      unsigned long tint_color)                 // 0xAARRGGBB, AA unused
 {
     const int offs_r = disp->offs_r, bits_r = disp->bits_r;
     const int offs_g = disp->offs_g, bits_g = disp->bits_g;
     const int offs_b = disp->offs_b, bits_b = disp->bits_b;
     const int offs_a = disp->offs_a, bits_a = disp->bits_a;
-    const int bits_lum = 8;
+    const int bits_component = 8;
+    const int rshift_r = bits_component - bits_r;
+    const int rshift_g = bits_component - bits_g;
+    const int rshift_b = bits_component - bits_b;
+    const int rshift_a = bits_component - bits_a;
+    const int pix_full_alpha = (0xff >> rshift_a) << offs_a;
     PIXEL * restrict dest = disp->backbuf;
     const int dest_pitch = disp->width;
 
@@ -123,6 +129,10 @@ static void blit_8_or(INFODISPLAY *disp,                        // target displa
 
     int dest_offs = target_top * dest_pitch + target_left;
 
+    const unsigned char tint_r = (unsigned char)((tint_color >> 16) & 0xff);
+    const unsigned char tint_g = (unsigned char)((tint_color >> 8)  & 0xff);
+    const unsigned char tint_b = (unsigned char)((tint_color)       & 0xff);
+
     for (int y = target_top; y < target_bottom; ++y)
     {
         PIXEL * restrict destpx = dest + dest_offs;
@@ -131,10 +141,14 @@ static void blit_8_or(INFODISPLAY *disp,                        // target displa
         {
             PIXEL pix = 0;
             const unsigned char lum = *srcpx;
-            pix |= (lum >> (bits_lum - bits_r)) << offs_r;
-            pix |= (lum >> (bits_lum - bits_g)) << offs_g;
-            pix |= (lum >> (bits_lum - bits_b)) << offs_b;
-            pix |= (0xff >> (8 - bits_a)) << offs_a;
+            int alpha = lum + 1; // +1 = blinn/sree trick
+            const unsigned char r = (unsigned char)((alpha * tint_r) >> 8);
+            const unsigned char g = (unsigned char)((alpha * tint_g) >> 8);
+            const unsigned char b = (unsigned char)((alpha * tint_b) >> 8);
+            pix |= (r >> rshift_r) << offs_r;
+            pix |= (g >> rshift_g) << offs_g;
+            pix |= (b >> rshift_b) << offs_b;
+            pix |= pix_full_alpha;
             *destpx |= pix;
             ++destpx;
             ++srcpx;
@@ -237,7 +251,8 @@ static void blit_row_textsurf(INFODISPLAY *disp, int info_row, int dx, int dy,
     blit_8_or(disp,                                      // target & clip rect:
               clip_top_left_x, clip_top_left_y, clip_width, clip_height,
               dx, dy,                                    // target pos
-              surf->pixels, width, height, surf->pitch); // src data, size and pitch
+              surf->pixels, width, height, surf->pitch,  // src data, size and pitch
+              disp->info_row_color[info_row]);           // tint color
 }
 
 
@@ -247,7 +262,8 @@ static void draw_icon(INFODISPLAY *disp, int dx, int dy, unsigned char *icon)
 {
     blit_8_or(disp, 0, 0, disp->width, disp->height,      // target & clip rect
               dx, dy,                                     // target pos
-              icon, ICON_WIDTH, ICON_HEIGHT, ICON_WIDTH); // src data, size and pitch
+              icon, ICON_WIDTH, ICON_HEIGHT, ICON_WIDTH,  // src data, size and pitch
+              0xffffffff);                                // tint color
 }
 
 
@@ -297,6 +313,13 @@ INFODISPLAY * infodisplay_create(int width, int height,
     disp->bits_g = bits_g;
     disp->bits_b = bits_b;
     disp->bits_a = bits_a;
+
+    for (int a = 0; a < INFODISPLAY_ROW_COUNT; ++a)
+    {
+        // default value for most row-specific data is 0 (from calloc),
+        // the rest is set here
+        disp->info_row_color[a] = 0xffffffff;
+    }
 
     if (ttf_filename != NULL)
     do {
@@ -359,6 +382,20 @@ void infodisplay_close(INFODISPLAY *disp)
 void infodisplay_set_progress(INFODISPLAY *disp, float progress)
 {
     disp->info_progress = progress;
+}
+
+// row=[0..INFODISPLAY_ROW_COUNT[, color as 0xAARRGGBB (AA not used for now)
+void infodisplay_set_row_color(INFODISPLAY *disp, int row, unsigned long color)
+{
+    #ifdef DEBUG_SUPPORT
+    if (row < 0 || row >= INFODISPLAY_ROW_COUNT)
+    {
+        dbg_printf("infodisplay_set_row_color: Invalid row number %d\n", row);
+        return;
+    }
+    #endif
+
+    disp->info_row_color[row] = color;
 }
 
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
