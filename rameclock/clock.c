@@ -232,7 +232,7 @@ int main(int argc, char **argv)
 	background_rect = create_rect(0, 0, s->screen_width, s->screen_height);
 
 	if (digital) {
-		font = font_load_default(s, 128);
+		font = font_load_default(s, analog && ratio > 1 ? s->screen_height / 4 : s->screen_width / 5);
 		update_time(&tv, &tm, time_buf);
 		font_get_text_extent(font, time_buf, &digital_w, &digital_h);
 	}
