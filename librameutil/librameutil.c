@@ -163,7 +163,7 @@ static const FT_Outline_Funcs outline_funcs = {
 	.cubic_to = vg_cubic_to,
 };
 
-fontdata_t *font_load(state_t *s, const char *filename, int face_index)
+fontdata_t *font_load(state_t *s, const char *filename, int face_index, unsigned int size)
 {
 	fontdata_t *f = calloc(1, sizeof(fontdata_t));
 	if (!f) return 0;
@@ -171,7 +171,7 @@ fontdata_t *font_load(state_t *s, const char *filename, int face_index)
 	f->font = vgCreateFont(0);
 	assert(f->font != VG_INVALID_HANDLE);
 	assert(!FT_New_Face(s->freetype, filename, face_index, &f->face));
-	assert(!FT_Set_Pixel_Sizes(f->face, 0, 128));
+	assert(!FT_Set_Pixel_Sizes(f->face, 0, size));
 
 	f->height = float_from_26_6(f->face->size->metrics.height);
 	f->ascender = float_from_26_6(f->face->size->metrics.ascender);
@@ -179,8 +179,8 @@ fontdata_t *font_load(state_t *s, const char *filename, int face_index)
 	return f;
 }
 
-fontdata_t *font_load_default(state_t *s) {
-	return font_load(s, "/usr/share/fonts/TTF/FreeSerif.ttf", 0);
+fontdata_t *font_load_default(state_t *s, unsigned int size) {
+	return font_load(s, "/usr/share/fonts/TTF/FreeSerif.ttf", 0, size);
 }
 
 void font_unload(fontdata_t *f)
