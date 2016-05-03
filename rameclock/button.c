@@ -8,7 +8,7 @@
 #define TOPIC "rame/clock/alert"
 
 static struct mosquitto *mosq;
-static char state = 0;
+static char state = '0';
 
 static void set_state(char new) {
 	state = new;
@@ -37,13 +37,13 @@ int main(void) {
 		if (read(dev, report, REPORT_SIZE) == REPORT_SIZE)
 			switch (report[0]) {
 			case 21:
-				if (state) set_state(0);
+				if (state > '0') set_state('0');
 				break;
 			case 22:
-				if (state < 2) set_state(2);
+				if (state < '2') set_state('2');
 				break;
 			case 23:
-				if (!state) set_state(1);
+				if (state == '0') set_state('1');
 			}
 
 		mosquitto_loop(mosq, 100, 1);

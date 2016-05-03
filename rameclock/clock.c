@@ -180,7 +180,7 @@ int main(int argc, char **argv)
 
 	struct mosquitto *mosq = NULL;
 	time_t last_reconn_attempt = 0;
-	char alert_state = 0;
+	char alert_state = '0';
 	VGPaint alert_paint;
 
 	int opt;
@@ -267,7 +267,7 @@ int main(int argc, char **argv)
 		update_time(&tv, &tm, time_buf);
 
 		if (mosq && mosquitto_loop(mosq, 0, 1) && tv.tv_sec - last_reconn_attempt > 15) {
-			alert_state = 0;
+			alert_state = '0';
 			mosquitto_reconnect_async(mosq);
 			last_reconn_attempt = tv.tv_sec;
 		}
@@ -288,7 +288,7 @@ int main(int argc, char **argv)
 			vgSeti(VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE);
 		}
 
-		if (alert_state && (alert_state == 1 || tv.tv_usec >= 500000)) {
+		if (alert_state == '1' || (alert_state == '2' && tv.tv_usec >= 500000)) {
 			vgLoadIdentity();
 			vgSetPaint(alert_paint, VG_FILL_PATH);
 			vgDrawPath(background_rect, VG_STROKE_PATH | VG_FILL_PATH);
