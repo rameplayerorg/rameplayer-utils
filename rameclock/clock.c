@@ -281,7 +281,7 @@ int main(int argc, char **argv)
 		if (analog && logo != VG_INVALID_HANDLE) {
 			vgSeti(VG_MATRIX_MODE, VG_MATRIX_IMAGE_USER_TO_SURFACE);
 			vgLoadIdentity();
-			vgTranslate(s->screen_width / 2, digital_h + analog_h / 4);
+			vgTranslate(s->screen_width / 2, digital_h + analog_h / 2 - analog_size / 4);
 			vgScale(0.3, 0.3);
 			vgTranslate(-logo_w/2, -logo_h/2);
 			vgDrawImage(logo);
