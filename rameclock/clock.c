@@ -244,7 +244,7 @@ int main(int argc, char **argv)
 		analog_size = analog_h < s->screen_width ? analog_h : s->screen_width;
 
 		/* create standard translation (center screen) */
-		vgTranslate(s->screen_width / 2.0, digital_h + analog_h / 2.0);
+		vgTranslate(s->screen_width / 2.0, analog_h / 2.0);
 		vgScale(analog_size / 2.0, analog_size / 2.0);
 		vgGetMatrix(s->normalized_screen);
 
@@ -283,7 +283,7 @@ int main(int argc, char **argv)
 		if (analog && logo != VG_INVALID_HANDLE) {
 			vgSeti(VG_MATRIX_MODE, VG_MATRIX_IMAGE_USER_TO_SURFACE);
 			vgLoadIdentity();
-			vgTranslate(s->screen_width / 2, digital_h + analog_h / 2 - analog_size / 4);
+			vgTranslate(s->screen_width / 2, analog_h / 2 - analog_size / 4);
 			vgScale(0.3, 0.3);
 			vgTranslate(-logo_w/2, -logo_h/2);
 			vgDrawImage(logo);
@@ -337,7 +337,7 @@ int main(int argc, char **argv)
 		if (digital) {
 			vgSetPaint(black_paint, VG_FILL_PATH);
 			font_get_text_extent(font, time_buf, &digital_w, &digital_h);
-			font_draw_text(font, time_buf, (s->screen_width - digital_w) / 2.0, (s->screen_height - analog_h - digital_h) / 2.0, VG_FILL_PATH);
+			font_draw_text(font, time_buf, (s->screen_width - digital_w) / 2.0, (s->screen_height + analog_h - digital_h) / 2.0, VG_FILL_PATH);
 		}
 
 		assert(vgGetError() == VG_NO_ERROR);
