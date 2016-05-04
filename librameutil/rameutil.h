@@ -26,8 +26,7 @@ typedef struct fontdata {
 	uint8_t *loaded_map[1<<(16-LM_SIZE)];
 } fontdata_t;
 
-fontdata_t *font_load(state_t *s, const char *filename, int face_index, unsigned int size);
-fontdata_t *font_load_default(state_t *s, unsigned int size);
+fontdata_t *font_load(state_t *s, const char *name, int face_index, unsigned int size);
 void font_unload(fontdata_t *f);
 void font_get_text_extent(fontdata_t *f, const wchar_t *text, VGfloat *w, VGfloat *h);
 void font_draw_text(fontdata_t *f, const wchar_t *text, VGfloat x, VGfloat y, VGbitfield paint_mode);
