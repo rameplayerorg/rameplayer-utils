@@ -15,6 +15,8 @@
 #include "GLES/gl.h"
 #include "bcm_host.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 static VGPaint create_paint(const VGfloat rgba[4])
 {
 	VGPaint paint = vgCreatePaint();
@@ -241,7 +243,8 @@ int main(int argc, char **argv)
 
 	if (analog) {
 		analog_h = s->screen_height - digital_h;
-		analog_size = analog_h < s->screen_width ? analog_h : s->screen_width;
+		analog_size = MIN(analog_h, s->screen_width);
+		if (digital) analog_h = MIN(analog_h, analog_size);
 
 		/* create standard translation (center screen) */
 		vgTranslate(s->screen_width / 2.0, analog_h / 2.0);
