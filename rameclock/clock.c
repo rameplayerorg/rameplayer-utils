@@ -167,7 +167,9 @@ int main(int argc, char **argv)
 	VGPaint black_paint, gradient_paint;
 
 	int analog = 1;
-	int analog_size, analog_h, logo_w, logo_h;
+	VGfloat analog_h = 0;
+	VGfloat analog_size;
+	int logo_w, logo_h;
 	VGImage logo = VG_INVALID_HANDLE;
 	VGPath mega_tick, big_tick, small_tick, hour_hand, minute_hand, second_hand;
 	VGPaint red_paint, silver_paint;
