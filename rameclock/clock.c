@@ -100,7 +100,8 @@ static const VGfloat rgba_white[4]  = { 1.0, 1.0, 1.0, 1.0 };
 static const VGfloat rgba_red[4]    = { 1.0,   0,   0, 1.0 };
 static const VGfloat rgba_black[4]  = {   0,   0,   0, 1.0 };
 static const VGfloat rgba_silver[4] = { 0.3, 0.3, 0.3, 1.0 };
-static const VGfloat rgba_alert[4]  = { 1.0,   0,   0, 0.4 };
+
+static const VGfloat rgba_alert[2][4] = {{1.0, 1.0, 0, 0.4}, {1.0, 0, 0, 0.4}};
 
 static VGImage load_ppm(const char *filename, int *logo_w, int *logo_h)
 {
@@ -185,7 +186,7 @@ int main(int argc, char **argv)
 	struct mosquitto *mosq = NULL;
 	time_t last_reconn_attempt = 0;
 	char alert_state = '0';
-	VGPaint alert_paint;
+	VGPaint alert_paint[2];
 
 	int opt;
 	static const struct option long_options[] = {
@@ -201,7 +202,8 @@ int main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, "b:d:l:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'b':
-			alert_paint = create_paint(rgba_alert);
+			for (i = 0; i < 2; i++)
+				alert_paint[i] = create_paint(rgba_alert[i]);
 
 			mosquitto_lib_init();
 			mosq = mosquitto_new(NULL, true, &alert_state);
@@ -295,7 +297,7 @@ int main(int argc, char **argv)
 
 		if (alert_state == '1' || (alert_state == '2' && tv.tv_usec >= 500000)) {
 			vgLoadIdentity();
-			vgSetPaint(alert_paint, VG_FILL_PATH);
+			vgSetPaint(alert_paint[alert_state - '1'], VG_FILL_PATH);
 			vgDrawPath(background_rect, VG_STROKE_PATH | VG_FILL_PATH);
 		}
 
