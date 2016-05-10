@@ -273,7 +273,7 @@ int main(int argc, char **argv)
 	while (1) {
 		update_time(&tv, &tm, time_buf);
 
-		if (mosq && mosquitto_loop(mosq, 0, 1) && tv.tv_sec - last_reconn_attempt > 15) {
+		if (mosq && mosquitto_loop(mosq, 0, 1) && tv.tv_sec - last_reconn_attempt > 5) {
 			alert_state = '0';
 			mosquitto_reconnect_async(mosq);
 			last_reconn_attempt = tv.tv_sec;
