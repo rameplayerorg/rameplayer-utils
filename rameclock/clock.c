@@ -15,8 +15,6 @@
 #include "GLES/gl.h"
 #include "bcm_host.h"
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-
 static VGPaint create_paint(const VGfloat rgba[4])
 {
 	VGPaint paint = vgCreatePaint();
@@ -170,8 +168,7 @@ int main(int argc, char **argv)
 	VGPaint black_paint, gradient_paint;
 
 	int analog = 1;
-	VGfloat analog_h = 0;
-	VGfloat analog_size;
+	VGfloat analog_h, analog_size;
 	int logo_w, logo_h;
 	VGImage logo = VG_INVALID_HANDLE;
 	VGPath mega_tick, big_tick, small_tick, hour_hand, minute_hand, second_hand;
@@ -245,8 +242,12 @@ int main(int argc, char **argv)
 
 	if (analog) {
 		analog_h = s->screen_height - digital_h;
-		analog_size = MIN(analog_h, s->screen_width);
-		if (digital) analog_h = MIN(analog_h, analog_size);
+		if (analog_h < s->screen_width) analog_size = analog_h;
+		else {
+			analog_size = s->screen_width;
+			if (digital)
+				analog_h = (analog_h * 2 + analog_size) / 3;
+		}
 
 		/* create standard translation (center screen) */
 		vgTranslate(s->screen_width / 2.0, analog_h / 2.0);
@@ -342,7 +343,7 @@ int main(int argc, char **argv)
 		if (digital) {
 			vgSetPaint(black_paint, VG_FILL_PATH);
 			font_get_text_extent(font, time_buf, &digital_w, &digital_h);
-			font_draw_text(font, time_buf, (s->screen_width - digital_w) / 2.0, (s->screen_height + analog_h - digital_h) / 2.0, VG_FILL_PATH);
+			font_draw_text(font, time_buf, (s->screen_width - digital_w) / 2.0, analog ? analog_h : (s->screen_height - digital_h) / 2.0, VG_FILL_PATH);
 		}
 
 		assert(vgGetError() == VG_NO_ERROR);
