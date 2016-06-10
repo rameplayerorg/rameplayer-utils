@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <linux/input.h>
 #include <mosquitto.h>
 #include <string.h>
 #include <sys/types.h>
@@ -37,15 +38,24 @@ static void handle_hidraw(int dev) {
 		}
 }
 
+static void handle_input(int dev) {
+	struct input_event ev;
+
+	if (read(dev, &ev, sizeof(ev)) == sizeof(ev) && ev.type == EV_KEY && ev.value && ev.code >= KEY_1 && ev.code <= KEY_3)
+		set_state(ev.code - KEY_1 + '0');
+}
+
 int main(int argc, char **argv) {
+	int dev;
 	void (*handler)(int);
 
 	if (argc < 3) return 1;
 
 	if (!strcmp(argv[1], "hidraw")) handler = handle_hidraw;
+	else if (!strcmp(argv[1], "input")) handler = handle_input;
 	else return 1;
 
-	int dev = open(argv[2], O_RDWR);
+	dev = open(argv[2], O_RDWR);
 	if (dev == -1) return 1;
 
 	fcntl(dev, F_SETFL, fcntl(dev, F_GETFL, 0) | O_NONBLOCK);
