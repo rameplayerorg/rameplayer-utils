@@ -93,8 +93,7 @@ static void print_fb_info(struct fb_var_screeninfo *vinfo, struct fb_fix_screeni
 static unsigned long parse_hex_color(const char *str)
 {
     unsigned long result = 0;
-    int a;
-    for (a = 0; a < 8; ++a, ++str)
+    for (int a = 0; a < 8; ++a, ++str)
     {
         char ch = *str;
         if (ch == 0)
