@@ -133,11 +133,13 @@ static void blit_8_or(INFODISPLAY *disp,                        // target displa
     const unsigned char tint_g = (unsigned char)((tint_color >> 8)  & 0xff);
     const unsigned char tint_b = (unsigned char)((tint_color)       & 0xff);
 
-    for (int y = target_top; y < target_bottom; ++y)
+    int y;
+    for (y = target_top; y < target_bottom; ++y)
     {
         PIXEL * restrict destpx = dest + dest_offs;
         const unsigned char * restrict srcpx = src + src_offs;
-        for (int x = target_left; x < target_right; ++x)
+        int x;
+        for (x = target_left; x < target_right; ++x)
         {
             PIXEL pix = 0;
             const unsigned char lum = *srcpx;
@@ -276,6 +278,7 @@ INFODISPLAY * infodisplay_create(int width, int height,
                                  const char *ttf_filename)
 {
     INFODISPLAY *disp;
+    int a;
 
     if (width <= 0 || height <= 0)
     {
@@ -314,7 +317,7 @@ INFODISPLAY * infodisplay_create(int width, int height,
     disp->bits_b = bits_b;
     disp->bits_a = bits_a;
 
-    for (int a = 0; a < INFODISPLAY_ROW_COUNT; ++a)
+    for (a = 0; a < INFODISPLAY_ROW_COUNT; ++a)
     {
         // default value for most row-specific data is 0 (from calloc),
         // the rest is set here
@@ -363,12 +366,13 @@ INFODISPLAY * infodisplay_create(int width, int height,
 // closes infodisplay and frees its memory
 void infodisplay_close(INFODISPLAY *disp)
 {
+    int a;
     if (disp == NULL)
         return;
     if (disp->font != NULL)
         TTF_CloseFont(disp->font);
     free(disp->backbuf);
-    for (int a = 0; a < INFODISPLAY_ROW_COUNT; ++a)
+    for (a = 0; a < INFODISPLAY_ROW_COUNT; ++a)
     {
         free(disp->info_rows[a]);
         TTF_FreeSurface(disp->info_row_textsurf[a]);
@@ -498,7 +502,8 @@ void infodisplay_set_row_times(INFODISPLAY *disp, int row, int time1_ms, int tim
     // (effective min/max values due to int32 range)
     char res[27] = { 0 }, tmp[13] = { 0 };
     int times[2] = { time1_ms, time2_ms };
-    for (int a = 0; a < 2; ++a)
+    int a;
+    for (a = 0; a < 2; ++a)
     {
         const char *sign;
         unsigned int t;
@@ -548,10 +553,12 @@ static void draw_progress(INFODISPLAY *disp, int progress_bar_y)
     if (progress >= disp->width) progress = disp->width;
     const int h = disp->progress_bar_height;
     PIXEL * restrict dest_row = disp->backbuf + progress_bar_y * disp->width;
-    for (int y = 0; y < h; ++y)
+    int y;
+    for (y = 0; y < h; ++y)
     {
         PIXEL * restrict dest = dest_row;
-        for (int x = 0; x < progress; ++x)
+        int x;
+        for (x = 0; x < progress; ++x)
             *dest++ = play_bar_color_16_565;
         dest_row += disp->width;
     }
@@ -565,7 +572,7 @@ static time_t s_start_time_sec = 0;
 // new refresh on next available frame (instead of waiting for outside event).
 void infodisplay_update(INFODISPLAY *disp, int *ret_req)
 {
-    int y, progress_bar_y = 0;
+    int row, y, progress_bar_y = 0;
     struct timeval tv;
     int anim_time_ms = 0;
     int req_refresh = 0;
@@ -604,7 +611,7 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
     memset(disp->backbuf, 0, disp->backbuf_size);
 
     y = 0;
-    for (int row = 0; row < INFODISPLAY_ROW_COUNT; ++row)
+    for (row = 0; row < INFODISPLAY_ROW_COUNT; ++row)
     {
         int x = 0;
 

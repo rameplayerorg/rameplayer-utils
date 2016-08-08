@@ -436,6 +436,8 @@ static void catch_sig_quit(int signum)
 
 int main(int argc, char **argv)
 {
+    int a;
+
     signal(SIGTERM, catch_sig_quit);
     signal(SIGABRT, catch_sig_quit);
     signal(SIGINT, catch_sig_quit);
@@ -443,7 +445,7 @@ int main(int argc, char **argv)
     setlogmask(LOG_UPTO(LOG_DEBUG));
     openlog("ramefbcp", LOG_NDELAY | LOG_PID, LOG_USER);
 
-    for (int a = 1; a < argc; ++a)
+    for (a = 1; a < argc; ++a)
     {
         if (argv[a] == NULL)
             continue;
