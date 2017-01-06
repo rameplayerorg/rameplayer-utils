@@ -37,7 +37,7 @@ static void draw(state_t *s, const char *text)
 	size_t n;
 	int i;
 
-	f = font_load(s, "FreeSerif", 0, 128);
+	f = font_load(s, "FreeSerif", 0, 96);
 	vgClear(0, 0, s->screen_width, s->screen_height);
 
 	setfill(white);
