@@ -19,7 +19,7 @@
 static const int infodisplay_icon_text_horiz_gap = 2;
 static const int infodisplay_progress_bar_height = 2;
 
-static const unsigned long play_bar_color_32 = 0xfff12b24;
+//static const unsigned long play_bar_color_32 = 0xfff12b24;
 static const unsigned short play_bar_color_16_565 = 0xf144;
 
 static const int animation_cycle_length_ms = 1000;
