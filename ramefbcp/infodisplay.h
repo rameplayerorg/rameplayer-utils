@@ -13,6 +13,7 @@ typedef PIXEL16 PIXEL; // hardcoded to 16bpp for now, maybe expand format suppor
 
 #define INFODISPLAY_ROW_COUNT 7
 #define INFODISPLAY_DEFAULT_PROGRESS_BAR_ROW (INFODISPLAY_ROW_COUNT - 2)
+#define INFODISPLAY_DEFAULT_PROGRESS_BAR_COLOR ((unsigned long)0xfff12b24)
 
 
 typedef enum INFODISPLAY_ICON_ENUM
@@ -24,6 +25,8 @@ typedef enum INFODISPLAY_ICON_ENUM
     INFODISPLAY_ICON_STOPPED,
     INFODISPLAY_ICON_BUFFERING,
     INFODISPLAY_ICON_WAITING,
+    INFODISPLAY_ICON_MEMCARD,
+    INFODISPLAY_ICON_FOLDER,
     INFODISPLAY_ICON_COUNT //
 } INFODISPLAY_ICON;
 
@@ -44,6 +47,7 @@ typedef struct _INFODISPLAY
     int width, height;
     int progress_bar_row; // draw bar above this text row (affects text row y)
     int progress_bar_height;
+    unsigned long progress_bar_color;
     int row_height; // amount of pixels per text row
     // rgba offset & bit width inside pixels:
     unsigned char offs_r, bits_r, offs_g, bits_g, offs_b, bits_b, offs_a, bits_a;
@@ -57,7 +61,8 @@ typedef struct _INFODISPLAY
     TTF_Surface *info_row_textsurf[INFODISPLAY_ROW_COUNT]; // cached rendered texts
     float info_row_scroll_time_s[INFODISPLAY_ROW_COUNT]; // row scroll times in seconds
     int info_row_text_width[INFODISPLAY_ROW_COUNT]; // cached text width
-    unsigned long info_row_color[INFODISPLAY_ROW_COUNT]; // color for each row
+    unsigned long info_row_color[INFODISPLAY_ROW_COUNT]; // text color for each row
+    unsigned long info_row_bkg_color[INFODISPLAY_ROW_COUNT]; // background color for each row
 } INFODISPLAY;
 
 
@@ -71,10 +76,10 @@ extern INFODISPLAY * infodisplay_create(int width, int height,
 // closes infodisplay and frees its memory
 extern void infodisplay_close(INFODISPLAY *disp);
 
-// progress=[0..1]
-extern void infodisplay_set_progress(INFODISPLAY *disp, float progress);
-// row=[0..INFODISPLAY_ROW_COUNT[, color as 0xAARRGGBB (AA not used for now)
-extern void infodisplay_set_row_color(INFODISPLAY *disp, int row, unsigned long color);
+// row=[-1..INFODISPLAY_ROW_COUNT] progress=[0..1]
+extern void infodisplay_set_progress(INFODISPLAY *disp, int row, float progress, unsigned long color);
+// row=[0..INFODISPLAY_ROW_COUNT[, color and bkg_color as 0xAARRGGBB (AA not used for now)
+extern void infodisplay_set_row_color(INFODISPLAY *disp, int row, unsigned long color, unsigned long bkg_color);
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
 extern void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text);
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8

@@ -16,8 +16,8 @@
 
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 2
-#define VERSION_PATCH 3
+#define VERSION_MINOR 3
+#define VERSION_PATCH 0
 
 #define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
 
@@ -31,8 +31,6 @@
 static int s_alive = 1;
 
 static const char *s_ttf_filename = NULL;
-
-static INFODISPLAY_ICON s_current_status = INFODISPLAY_ICON_NONE;
 
 
 static void print_fb_info(struct fb_var_screeninfo *vinfo, struct fb_fix_screeninfo *finfo)
@@ -134,12 +132,22 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
             // set text tint color for the row, AARRGGBB hex value
             // (AA=alpha is not currently used though)
             // e.g. "O3:FF005500" for dark green
-            int rown = line[1] - '1';
-            if (rown >= 0 && rown < INFODISPLAY_ROW_COUNT &&
-                line[2] == ':' && strlen(&line[3]) >= 6)
+            int rown = line[1] - '1', comma = 0;
+            unsigned long bkg_color = 0;
+            char tmp[32];
+            tmp[31] = 0;
+            if (rown < 0 || rown >= INFODISPLAY_ROW_COUNT || line[2] != ':')
+                break;
+            strncpy(tmp, &line[3], 31);
+            while (tmp[comma] != ',' && tmp[comma] != 0)
+                ++comma;
+            if (tmp[comma] == ',' && strlen(&tmp[comma + 1]) >= 6)
+                bkg_color = parse_hex_color(&tmp[comma + 1]);
+            tmp[comma] = 0;
+            if (strlen(tmp) >= 6)
             {
-                unsigned long color = parse_hex_color(&line[3]);
-                infodisplay_set_row_color(infodisplay, rown, color);
+                unsigned long color = parse_hex_color(tmp);
+                infodisplay_set_row_color(infodisplay, rown, color, bkg_color);
             }
         }
         break;
@@ -159,29 +167,60 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
 
         case 'P':
         {
-            // progress bar, value is [0..1000], e.g. "P:567"
-            int value = -1;
-            if (line[1] == ':' && line[2] >= '0' && line[2] <= '9')
-                value = atoi(&line[2]);
+            // Set progress bar length, value is [0..1000], e.g. "P:567".
+            // Can optionally give row number [1..INFODISPLAY_ROW_COUNT], max 9 rows.
+            // The bar is drawn above the given row, e.g. "P1:567" draws to top of screen,
+            // or "P8:1000" draws solid line below last row (when INFODISPLAY_ROW_COUNT==7).
+            // Giving row=0 will disable progress bar and center all the rows vertically instead.
+            // Can also optionally give color at end, separated by comma, e.g.: "P6:100,FF44AAFF"
+            int rown = INFODISPLAY_DEFAULT_PROGRESS_BAR_ROW;
+            int value = -1, vpos = 2, comma = 0;
+            unsigned long color = INFODISPLAY_DEFAULT_PROGRESS_BAR_COLOR;
+            char tmp[32];
+            tmp[31] = 0;
+            if (line[1] >= '0' && line[1] <= '9')
+            {
+                rown = line[1] - '1';
+                ++vpos;
+            }
+            if (line[vpos - 1] != ':')
+                break;
+            strncpy(tmp, &line[vpos], 31);
+            while (tmp[comma] != ',' && tmp[comma] != 0)
+                ++comma;
+            if (tmp[comma] == ',' && strlen(&tmp[comma + 1]) >= 6)
+            {
+                color = parse_hex_color(&tmp[comma + 1]); // 2nd token found (color)
+            }
+            tmp[comma] = 0;
+            value = atoi(tmp); // 1st token is progress bar value
             if (value >= 0)
-                infodisplay_set_progress(infodisplay, value / 1000.0f);
+                infodisplay_set_progress(infodisplay, rown, value / 1000.0f, color);
         }
         break;
 
         case 'S':
         {
-            // set status (icon), value from INFODISPLAY_ICON, e.g. "S:4"
+            // set icon to row number [1..INFODISPLAY_ROW_COUNT], max 9 rows.
+            // row number is optional, if it's omitted, last available row is used.
+            // e.g. "S:4" or "S3:5"
+            int rown = -1;
             int value = -1;
             if (line[1] == ':')
                 value = line[2] - '0';
-            if (value >= INFODISPLAY_ICON_NONE &&
-                value < INFODISPLAY_ICON_COUNT)
+            else
             {
-                s_current_status = (INFODISPLAY_ICON)value;
-                infodisplay_set_row_icon(infodisplay,
-                                         INFODISPLAY_ROW_COUNT - 1,
-                                         (INFODISPLAY_ICON)value);
+                if (line[2] == ':')
+                    value = line[3] - '0';
+                rown = line[1] - '1';
             }
+            if (value < 0 || value >= INFODISPLAY_ICON_COUNT)
+                value = INFODISPLAY_ICON_NONE;
+            if (rown < 0 || rown >= INFODISPLAY_ROW_COUNT)
+                rown = INFODISPLAY_ROW_COUNT - 1;
+            infodisplay_set_row_icon(infodisplay,
+                                     rown,
+                                     (INFODISPLAY_ICON)value);
         }
         break;
 
@@ -370,11 +409,13 @@ static int process()
             } while (try_read_more);
         }
 
-        // always refresh display when we're in a state with animated icon:
-        if (s_current_status == INFODISPLAY_ICON_BUFFERING ||
-            s_current_status == INFODISPLAY_ICON_WAITING)
+        // always refresh display when an animated icon is in use
+        for (int a = 0; a < INFODISPLAY_ROW_COUNT; ++a)
         {
-            need_to_refresh_display = 1;
+            INFODISPLAY_ICON i = infodisplay->info_row_icon[a];
+            if (i == INFODISPLAY_ICON_BUFFERING ||
+                i == INFODISPLAY_ICON_WAITING)
+                need_to_refresh_display = 1;
         }
 
         if (infodisplay != NULL && need_to_refresh_display)

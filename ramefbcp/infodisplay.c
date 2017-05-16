@@ -19,9 +19,6 @@
 static const int infodisplay_icon_text_horiz_gap = 2;
 static const int infodisplay_progress_bar_height = 2;
 
-//static const unsigned long play_bar_color_32 = 0xfff12b24;
-static const unsigned short play_bar_color_16_565 = 0xf144;
-
 static const int animation_cycle_length_ms = 1000;
 
 static const float scroll_speed_pix_per_s = 20.0f;
@@ -75,6 +72,146 @@ static float boxpulsef(float value,
          - boxstepf(value, down_slope_start, down_slope_end);
 }
 
+
+// Clipped rectangle fill with opaque color. 32bpp source color to 16bpp target.
+static void fill_rect(INFODISPLAY *disp,                        // target display
+                      int clip_top_left_x, int clip_top_left_y, // target clip rect top-left
+                      int clip_width, int clip_height,          // target clip rect size
+                      int top_left_x, int top_left_y,           // target top-left coordinate
+                      int rect_width, int rect_height,          // rectangle size
+                      unsigned long color)                      // 0xAARRGGBB
+{
+    const int offs_r = disp->offs_r, bits_r = disp->bits_r;
+    const int offs_g = disp->offs_g, bits_g = disp->bits_g;
+    const int offs_b = disp->offs_b, bits_b = disp->bits_b;
+    const int offs_a = disp->offs_a, bits_a = disp->bits_a;
+    const int bits_component = 8;
+    const int rshift_r = bits_component - bits_r;
+    const int rshift_g = bits_component - bits_g;
+    const int rshift_b = bits_component - bits_b;
+    const int rshift_a = bits_component - bits_a;
+    const int pix_full_alpha = (0xff >> rshift_a) << offs_a;
+    PIXEL * restrict dest = disp->backbuf;
+    const int dest_pitch = disp->width;
+
+    const PIXEL pix = ((((color >> 16) & 0xff) >> rshift_r) << offs_r) |
+                      ((((color >> 8)  & 0xff) >> rshift_g) << offs_g) |
+                      ((((color)       & 0xff) >> rshift_b) << offs_b) |
+                      pix_full_alpha;
+
+    // clip cliprect against disp size
+    // result: top-left inclusive; bottom-right exclusive
+    int clip_left = maxi(0, clip_top_left_x);
+    int clip_top = maxi(0, clip_top_left_y);
+    int clip_right = mini(disp->width, clip_top_left_x + clip_width);
+    int clip_bottom = mini(disp->height, clip_top_left_y + clip_height);
+    if (clip_right <= clip_left || clip_bottom <= clip_top)
+        return; // empty target clip rect
+    // NB! now invalid: clip_top_left_x clip_top_left_y clip_width clip_height
+
+    // clip target pos and source size against the clip rect
+    // result: top-left inclusive; bottom-right exclusive
+    int target_left = maxi(top_left_x, clip_left);
+    int target_top = maxi(top_left_y, clip_top);
+    int target_right = mini(top_left_x + rect_width, clip_right);
+    int target_bottom = mini(top_left_y + rect_height, clip_bottom);
+    if (target_right <= target_left || target_bottom <= target_top)
+        return; // empty result drawing rect
+
+    int dest_offs = target_top * dest_pitch + target_left;
+
+    for (int y = target_top; y < target_bottom; ++y)
+    {
+        PIXEL * restrict destpx = dest + dest_offs;
+        for (int x = target_left; x < target_right; ++x)
+        {
+            *destpx = pix;
+            ++destpx;
+        }
+        dest_offs += dest_pitch;
+    }
+}
+
+// Clipped rectangle filling with alpha blending. 32bpp source color to 16bpp target.
+static void blend_rect(INFODISPLAY *disp,                        // target display
+                       int clip_top_left_x, int clip_top_left_y, // target clip rect top-left
+                       int clip_width, int clip_height,          // target clip rect size
+                       int top_left_x, int top_left_y,           // target top-left coordinate
+                       int rect_width, int rect_height,          // rectangle size
+                       unsigned long color)                      // 0xAARRGGBB
+{
+    const int offs_r = disp->offs_r, bits_r = disp->bits_r;
+    const int offs_g = disp->offs_g, bits_g = disp->bits_g;
+    const int offs_b = disp->offs_b, bits_b = disp->bits_b;
+    const int offs_a = disp->offs_a, bits_a = disp->bits_a;
+    const unsigned char mask_bits_r = (unsigned char)((1 << bits_r) - 1);
+    const unsigned char mask_bits_g = (unsigned char)((1 << bits_g) - 1);
+    const unsigned char mask_bits_b = (unsigned char)((1 << bits_b) - 1);
+    const int bits_component = 8;
+    const int rshift_r = bits_component - bits_r;
+    const int rshift_g = bits_component - bits_g;
+    const int rshift_b = bits_component - bits_b;
+    const int rshift_a = bits_component - bits_a;
+    const int pix_full_alpha = (0xff >> rshift_a) << offs_a;
+    PIXEL * restrict dest = disp->backbuf;
+    const int dest_pitch = disp->width;
+
+    // clip cliprect against disp size
+    // result: top-left inclusive; bottom-right exclusive
+    int clip_left = maxi(0, clip_top_left_x);
+    int clip_top = maxi(0, clip_top_left_y);
+    int clip_right = mini(disp->width, clip_top_left_x + clip_width);
+    int clip_bottom = mini(disp->height, clip_top_left_y + clip_height);
+    if (clip_right <= clip_left || clip_bottom <= clip_top)
+        return; // empty target clip rect
+    // NB! now invalid: clip_top_left_x clip_top_left_y clip_width clip_height
+
+    // clip target pos and source size against the clip rect
+    // result: top-left inclusive; bottom-right exclusive
+    int target_left = maxi(top_left_x, clip_left);
+    int target_top = maxi(top_left_y, clip_top);
+    int target_right = mini(top_left_x + rect_width, clip_right);
+    int target_bottom = mini(top_left_y + rect_height, clip_bottom);
+    if (target_right <= target_left || target_bottom <= target_top)
+        return; // empty result drawing rect
+
+    int dest_offs = target_top * dest_pitch + target_left;
+
+    const int alpha = ((color >> 24) & 0xff) + 1; // +1 = blinn/sree trick
+    const int one_minus_alpha = 256 - alpha;
+    const unsigned char color_r = (unsigned char)((color >> 16) & 0xff);
+    const unsigned char color_g = (unsigned char)((color >> 8)  & 0xff);
+    const unsigned char color_b = (unsigned char)((color)       & 0xff);
+    const unsigned char premul_r = (unsigned char)((alpha * color_r) >> 8);
+    const unsigned char premul_g = (unsigned char)((alpha * color_g) >> 8);
+    const unsigned char premul_b = (unsigned char)((alpha * color_b) >> 8);
+
+    for (int y = target_top; y < target_bottom; ++y)
+    {
+        PIXEL * restrict destpx = dest + dest_offs;
+        for (int x = target_left; x < target_right; ++x)
+        {
+            PIXEL org_dest_c = *destpx;
+            // scale components to 8 bits by replicating top bits to bottom
+            unsigned char dr = (unsigned char)((org_dest_c >> offs_r) & mask_bits_r);
+            dr = (dr << rshift_r) | (dr >> (bits_r - rshift_r));
+            unsigned char dg = (unsigned char)((org_dest_c >> offs_g) & mask_bits_g);
+            dg = (dg << rshift_g) | (dg >> (bits_g - rshift_g));
+            unsigned char db = (unsigned char)((org_dest_c >> offs_b) & mask_bits_b);
+            db = (db << rshift_b) | (db >> (bits_b - rshift_b));
+            const unsigned char r = (unsigned char)(((one_minus_alpha * dr) >> 8) + premul_r);
+            const unsigned char g = (unsigned char)(((one_minus_alpha * dg) >> 8) + premul_g);
+            const unsigned char b = (unsigned char)(((one_minus_alpha * db) >> 8) + premul_b);
+            PIXEL pix = pix_full_alpha;
+            pix |= (r >> rshift_r) << offs_r;
+            pix |= (g >> rshift_g) << offs_g;
+            pix |= (b >> rshift_b) << offs_b;
+            *destpx |= pix;
+            ++destpx;
+        }
+        dest_offs += dest_pitch;
+    }
+}
 
 
 // Clipped and color tinted blit from grayscale 8bpp source to 16bpp target,
@@ -139,17 +276,110 @@ static void blit_8_or(INFODISPLAY *disp,                        // target displa
         const unsigned char * restrict srcpx = src + src_offs;
         for (int x = target_left; x < target_right; ++x)
         {
-            PIXEL pix = 0;
             const unsigned char lum = *srcpx;
-            int alpha = lum + 1; // +1 = blinn/sree trick
+            const int alpha = lum + 1; // +1 = blinn/sree trick
             const unsigned char r = (unsigned char)((alpha * tint_r) >> 8);
             const unsigned char g = (unsigned char)((alpha * tint_g) >> 8);
             const unsigned char b = (unsigned char)((alpha * tint_b) >> 8);
+            PIXEL pix = pix_full_alpha;
             pix |= (r >> rshift_r) << offs_r;
             pix |= (g >> rshift_g) << offs_g;
             pix |= (b >> rshift_b) << offs_b;
-            pix |= pix_full_alpha;
             *destpx |= pix;
+            ++destpx;
+            ++srcpx;
+        }
+        dest_offs += dest_pitch;
+        src_offs += src_pitch;
+    }
+}
+
+// Clipped and color tinted blit from grayscale 8bpp source to 16bpp target, alpha blended to target.
+static void blit_8_blend(INFODISPLAY *disp,                        // target display
+                         int clip_top_left_x, int clip_top_left_y, // target clip rect top-left
+                         int clip_width, int clip_height,          // target clip rect size
+                         int top_left_x, int top_left_y,           // target top-left coordinate
+                         const unsigned char * restrict src,       // 8bpp grayscale source buffer
+                         int src_width, int src_height,            // source rect size
+                         int src_pitch,                            // source buffer pitch
+                         unsigned long tint_color)                 // 0xAARRGGBB, AA unused
+{
+    const int offs_r = disp->offs_r, bits_r = disp->bits_r;
+    const int offs_g = disp->offs_g, bits_g = disp->bits_g;
+    const int offs_b = disp->offs_b, bits_b = disp->bits_b;
+    const int offs_a = disp->offs_a, bits_a = disp->bits_a;
+    const unsigned char mask_bits_r = (unsigned char)((1 << bits_r) - 1);
+    const unsigned char mask_bits_g = (unsigned char)((1 << bits_g) - 1);
+    const unsigned char mask_bits_b = (unsigned char)((1 << bits_b) - 1);
+    const int bits_component = 8;
+    const int rshift_r = bits_component - bits_r;
+    const int rshift_g = bits_component - bits_g;
+    const int rshift_b = bits_component - bits_b;
+    const int rshift_a = bits_component - bits_a;
+    const int pix_full_alpha = (0xff >> rshift_a) << offs_a;
+    PIXEL * restrict dest = disp->backbuf;
+    const int dest_pitch = disp->width;
+
+    // clip cliprect against disp size
+    // result: top-left inclusive; bottom-right exclusive
+    int clip_left = maxi(0, clip_top_left_x);
+    int clip_top = maxi(0, clip_top_left_y);
+    int clip_right = mini(disp->width, clip_top_left_x + clip_width);
+    int clip_bottom = mini(disp->height, clip_top_left_y + clip_height);
+    if (clip_right <= clip_left || clip_bottom <= clip_top)
+        return; // empty target clip rect
+    // NB! now invalid: clip_top_left_x clip_top_left_y clip_width clip_height
+
+    // clip target pos and source size against the clip rect
+    // result: top-left inclusive; bottom-right exclusive
+    int target_left = maxi(top_left_x, clip_left);
+    int target_top = maxi(top_left_y, clip_top);
+    int target_right = mini(top_left_x + src_width, clip_right);
+    int target_bottom = mini(top_left_y + src_height, clip_bottom);
+    if (target_right <= target_left || target_bottom <= target_top)
+        return; // empty result drawing rect
+
+    // adjust source buffer offset to match clipped top-left part
+    int src_offs = 0;
+    if (target_left > top_left_x)
+        src_offs += target_left - top_left_x;
+    if (target_top > top_left_y)
+        src_offs += (target_top - top_left_y) * src_pitch;
+
+    int dest_offs = target_top * dest_pitch + target_left;
+
+    const unsigned char tint_r = (unsigned char)((tint_color >> 16) & 0xff);
+    const unsigned char tint_g = (unsigned char)((tint_color >> 8)  & 0xff);
+    const unsigned char tint_b = (unsigned char)((tint_color)       & 0xff);
+
+    for (int y = target_top; y < target_bottom; ++y)
+    {
+        PIXEL * restrict destpx = dest + dest_offs;
+        const unsigned char * restrict srcpx = src + src_offs;
+        for (int x = target_left; x < target_right; ++x)
+        {
+            PIXEL org_dest_c = *destpx;
+            // scale components to 8 bits by replicating top bits to bottom
+            unsigned char dr = (unsigned char)((org_dest_c >> offs_r) & mask_bits_r);
+            dr = (dr << rshift_r) | (dr >> (bits_r - rshift_r));
+            unsigned char dg = (unsigned char)((org_dest_c >> offs_g) & mask_bits_g);
+            dg = (dg << rshift_g) | (dg >> (bits_g - rshift_g));
+            unsigned char db = (unsigned char)((org_dest_c >> offs_b) & mask_bits_b);
+            db = (db << rshift_b) | (db >> (bits_b - rshift_b));
+
+            const unsigned char lum = *srcpx;
+            const int alpha = lum + 1; // +1 = blinn/sree trick
+            const int one_minus_alpha = 256 - alpha;
+            const unsigned char r = (unsigned char)(((alpha * tint_r) >> 8) + ((one_minus_alpha * dr) >> 8));
+            const unsigned char g = (unsigned char)(((alpha * tint_g) >> 8) + ((one_minus_alpha * dg) >> 8));
+            const unsigned char b = (unsigned char)(((alpha * tint_b) >> 8) + ((one_minus_alpha * db) >> 8));
+
+            PIXEL pix = pix_full_alpha;
+            pix |= (r >> rshift_r) << offs_r;
+            pix |= (g >> rshift_g) << offs_g;
+            pix |= (b >> rshift_b) << offs_b;
+
+            *destpx = pix;
             ++destpx;
             ++srcpx;
         }
@@ -248,22 +478,35 @@ static void blit_row_textsurf(INFODISPLAY *disp, int info_row, int dx, int dy,
         return; // error
     TTF_Surface *surf = disp->info_row_textsurf[info_row];
     int width = surf->w, height = surf->h;
-    blit_8_or(disp,                                      // target & clip rect:
-              clip_top_left_x, clip_top_left_y, clip_width, clip_height,
-              dx, dy,                                    // target pos
-              surf->pixels, width, height, surf->pitch,  // src data, size and pitch
-              disp->info_row_color[info_row]);           // tint color
+    if ((disp->info_row_bkg_color[info_row] & 0xffffff) == 0)
+        blit_8_or(disp,                                      // target & clip rect:
+                  clip_top_left_x, clip_top_left_y, clip_width, clip_height,
+                  dx, dy,                                    // target pos
+                  surf->pixels, width, height, surf->pitch,  // src data, size and pitch
+                  disp->info_row_color[info_row]);           // tint color
+    else
+        blit_8_blend(disp,                                      // target & clip rect:
+                     clip_top_left_x, clip_top_left_y, clip_width, clip_height,
+                     dx, dy,                                    // target pos
+                     surf->pixels, width, height, surf->pitch,  // src data, size and pitch
+                     disp->info_row_color[info_row]);           // tint color
 }
 
 
 // Custom icon drawing (from 8bpp grayscale to 16bpp destination buffer).
 // Note: No support for fb_var_screeninfo rgb msb_right!=0.
-static void draw_icon(INFODISPLAY *disp, int dx, int dy, unsigned char *icon)
+static void draw_icon(INFODISPLAY *disp, int dx, int dy, unsigned char *icon, unsigned long color, int use_blend)
 {
-    blit_8_or(disp, 0, 0, disp->width, disp->height,      // target & clip rect
-              dx, dy,                                     // target pos
-              icon, ICON_WIDTH, ICON_HEIGHT, ICON_WIDTH,  // src data, size and pitch
-              0xffffffff);                                // tint color
+    if (use_blend)
+        blit_8_blend(disp, 0, 0, disp->width, disp->height,      // target & clip rect
+                     dx, dy,                                     // target pos
+                     icon, ICON_WIDTH, ICON_HEIGHT, ICON_WIDTH,  // src data, size and pitch
+                     color);
+    else
+        blit_8_or(disp, 0, 0, disp->width, disp->height,      // target & clip rect
+                  dx, dy,                                     // target pos
+                  icon, ICON_WIDTH, ICON_HEIGHT, ICON_WIDTH,  // src data, size and pitch
+                  color);
 }
 
 
@@ -303,6 +546,7 @@ INFODISPLAY * infodisplay_create(int width, int height,
     disp->height = height;
     disp->progress_bar_row = INFODISPLAY_DEFAULT_PROGRESS_BAR_ROW;
     disp->progress_bar_height = infodisplay_progress_bar_height;
+    disp->progress_bar_color = INFODISPLAY_DEFAULT_PROGRESS_BAR_COLOR;
     disp->row_height = (height - disp->progress_bar_height) / INFODISPLAY_ROW_COUNT;
 
     disp->offs_r = offs_r;
@@ -319,6 +563,7 @@ INFODISPLAY * infodisplay_create(int width, int height,
         // default value for most row-specific data is 0 (from calloc),
         // the rest is set here
         disp->info_row_color[a] = 0xffffffff;
+        disp->info_row_bkg_color[a] = 0xff000000;
     }
 
     if (ttf_filename != NULL)
@@ -378,14 +623,16 @@ void infodisplay_close(INFODISPLAY *disp)
 }
 
 
-// progress=[0..1]
-void infodisplay_set_progress(INFODISPLAY *disp, float progress)
+// progress=[0..1], color=aarrggbb (32bits)
+void infodisplay_set_progress(INFODISPLAY *disp, int row, float progress, unsigned long color)
 {
+    disp->progress_bar_row = row;
+    disp->progress_bar_color = color;
     disp->info_progress = progress;
 }
 
-// row=[0..INFODISPLAY_ROW_COUNT[, color as 0xAARRGGBB (AA not used for now)
-void infodisplay_set_row_color(INFODISPLAY *disp, int row, unsigned long color)
+// row=[0..INFODISPLAY_ROW_COUNT[, color and bkg_color as 0xAARRGGBB (AA not used for now)
+void infodisplay_set_row_color(INFODISPLAY *disp, int row, unsigned long color, unsigned long bkg_color)
 {
     #ifdef DEBUG_SUPPORT
     if (row < 0 || row >= INFODISPLAY_ROW_COUNT)
@@ -396,6 +643,7 @@ void infodisplay_set_row_color(INFODISPLAY *disp, int row, unsigned long color)
     #endif
 
     disp->info_row_color[row] = color;
+    disp->info_row_bkg_color[row] = bkg_color;
 }
 
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
@@ -544,17 +792,14 @@ static void draw_progress(INFODISPLAY *disp, int progress_bar_y)
 {
     // progress bar length in pixels (scaled&clamped to width)
     int progress = (int)(disp->info_progress * disp->width);
-    if (progress < 0) progress = 0;
-    if (progress >= disp->width) progress = disp->width;
-    const int h = disp->progress_bar_height;
-    PIXEL * restrict dest_row = disp->backbuf + progress_bar_y * disp->width;
-    for (int y = 0; y < h; ++y)
-    {
-        PIXEL * restrict dest = dest_row;
-        for (int x = 0; x < progress; ++x)
-            *dest++ = play_bar_color_16_565;
-        dest_row += disp->width;
-    }
+    if (progress < 0)
+        return;
+    if (progress >= disp->width)
+        progress = disp->width;
+    blend_rect(disp, 0, 0, disp->width, disp->height,
+               0, progress_bar_y,
+               progress, disp->progress_bar_height,
+               disp->progress_bar_color);
 }
 
 
@@ -604,6 +849,11 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
     memset(disp->backbuf, 0, disp->backbuf_size);
 
     y = 0;
+
+    // progress bar is totally disabled, center vertically instead
+    if (disp->progress_bar_row < 0)
+        y = disp->progress_bar_height / 2;
+
     for (int row = 0; row < INFODISPLAY_ROW_COUNT; ++row)
     {
         int x = 0;
@@ -615,8 +865,14 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
             y += disp->progress_bar_height;
         }
 
+        if ((disp->info_row_bkg_color[row] & 0xffffff) != 0)
+            fill_rect(disp, 0, 0, disp->width, disp->height,
+                      x, y, disp->width, disp->row_height,
+                      disp->info_row_bkg_color[row]);
+
         if (disp->info_row_icon[row] != INFODISPLAY_ICON_NONE)
         {
+            unsigned long icon_color = 0xffffffff;
             unsigned char *icon = NULL;
             if (disp->info_row_icon[row] == INFODISPLAY_ICON_PLAYING)
                 icon = icon_playing;
@@ -634,10 +890,20 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
                 int anim_frame = anim_time_ms * ICON_WAITING_FRAMES / animation_cycle_length_ms;
                 icon = icon_waiting[anim_frame % ICON_WAITING_FRAMES];
             }
+            else if (disp->info_row_icon[row] == INFODISPLAY_ICON_MEMCARD)
+            {
+                icon = icon_memcard;
+                icon_color = 0xffffffcc;
+            }
+            else if (disp->info_row_icon[row] == INFODISPLAY_ICON_FOLDER)
+            {
+                icon = icon_folder;
+                icon_color = 0xffffe040;
+            }
             if (icon != NULL)
             {
                 int icon_y = y + (disp->row_height - ICON_HEIGHT) / 2;
-                draw_icon(disp, x, icon_y, icon);
+                draw_icon(disp, x, icon_y, icon, icon_color, (disp->info_row_bkg_color[row] & 0xffffff) != 0);
             }
 
             // indent text when icon space is in use
@@ -715,8 +981,17 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
         y += disp->row_height;
     }
 
-    if (disp->info_progress > 0)
+    if (disp->progress_bar_row >= INFODISPLAY_ROW_COUNT)
+    {
+        progress_bar_y = y;
+        y += disp->progress_bar_height;
+    }
+
+    if (disp->progress_bar_row >= 0 &&
+        disp->info_progress > 0)
+    {
         draw_progress(disp, progress_bar_y);
+    }
 
     if (!req_refresh)
         disp->prev_anim_time_ms = 0; // reset anim time delta (unknown time until next refresh)
