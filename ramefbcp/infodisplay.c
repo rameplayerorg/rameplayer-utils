@@ -900,6 +900,8 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
                 icon = icon_folder;
                 icon_color = 0xffffe040;
             }
+            else if (disp->info_row_icon[row] == INFODISPLAY_ICON_PLAYLIST)
+                icon = icon_playlist;
             if (icon != NULL)
             {
                 int icon_y = y + (disp->row_height - ICON_HEIGHT) / 2;
