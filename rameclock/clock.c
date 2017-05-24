@@ -8,6 +8,7 @@
 #include <wchar.h>
 #include <mosquitto.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "VG/openvg.h"
 #include "VG/vgu.h"
@@ -136,24 +137,55 @@ err:
 	return image;
 }
 
-#define TIME_BUF_SIZE 9
+#define TIME_BUF_SIZE 13
 
-static void update_time(struct timeval *tv, struct tm *tm, wchar_t *buf) {
+#define MODE_CLOCK     0
+#define MODE_STOPWATCH 1
+
+static char stopwatch_reset_flag = 0;
+static time_t stopwatch_start_time = 0;
+
+static void update_time(struct timeval *tv, struct tm *tm, wchar_t *buf, char mode) {
 	gettimeofday(tv, 0);
 	localtime_r(&tv->tv_sec, tm);
 
 	//tm->tm_hour = 7;
 	//tm->tm_min = 20;
 
-	wcsftime(buf, TIME_BUF_SIZE, L"%T", tm);
+	if (mode == MODE_STOPWATCH)
+	{
+		if (stopwatch_start_time == 0 ||
+		    stopwatch_reset_flag)
+		{
+			stopwatch_start_time = tv->tv_sec;
+			stopwatch_reset_flag = 0;
+		}
+		long sw_sec = (long)(tv->tv_sec - stopwatch_start_time);
+		int seconds = (int)(sw_sec % 60);
+		int minutes = (int)((sw_sec / 60) % 60);
+		int hours = (int)(sw_sec / 3600);
+		if (hours > 0) {
+			swprintf(buf, TIME_BUF_SIZE - 1, L"%d:%02d:%02d", hours, minutes, seconds);
+		} else {
+			swprintf(buf, TIME_BUF_SIZE - 1, L"%02d:%02d", minutes, seconds);
+		}
+	} else {
+		wcsftime(buf, TIME_BUF_SIZE, L"%T", tm);
+	}
 }
 
 static void on_connect(struct mosquitto *mosq, void *data, int status) {
 	if (!status) mosquitto_subscribe(mosq, NULL, "rame/clock/alert", 1);
 }
 
-static void on_message(struct mosquitto *mosq, void *data, const struct mosquitto_message *msg) {
-	if (msg->payloadlen) memcpy(data, msg->payload, 1);
+static void on_message(struct mosquitto *mosq, void *data, const struct mosquitto_message *msg)
+{
+	if (msg->payloadlen)
+	{
+		memcpy(data, msg->payload, 1);
+		if (*(char *)data == '0')
+			stopwatch_reset_flag = 1;
+	}
 }
 
 int main(int argc, char **argv)
@@ -176,13 +208,14 @@ int main(int argc, char **argv)
 
 	int digital = 0;
 	fontdata_t *font;
-	wchar_t time_buf[TIME_BUF_SIZE];
+	wchar_t time_buf[TIME_BUF_SIZE] = { 0 };
 	VGfloat digital_w;
 	VGfloat digital_h = 0;
 
 	struct mosquitto *mosq = NULL;
 	time_t last_reconn_attempt = 0;
 	char alert_state = '0';
+	char mode = MODE_CLOCK;
 	VGPaint alert_paint[2];
 
 	int opt;
@@ -190,13 +223,14 @@ int main(int argc, char **argv)
 		{"broker", required_argument, NULL, 'b'},
 		{"display", required_argument, NULL, 'd'},
 		{"logo", required_argument, NULL, 'l'},
+		{"mode", required_argument, NULL, 'm'},
 		{NULL, 0, NULL, 0}
 	};
 
 	bcm_host_init();
 	init_egl(s);
 
-	while ((opt = getopt_long(argc, argv, "b:d:l:", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "b:d:l:m:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'b':
 			for (i = 0; i < 2; i++)
@@ -218,6 +252,13 @@ int main(int argc, char **argv)
 			break;
 		case 'l':
 			logo = load_ppm(optarg, &logo_w, &logo_h);
+			break;
+		case 'm':
+			/* Note: clock is implicit default mode */
+			if (!strcmp(optarg, "stopwatch")) {
+				mode = MODE_STOPWATCH;
+			}
+			break;
 		}
 	}
 
@@ -236,7 +277,7 @@ int main(int argc, char **argv)
 
 	if (digital) {
 		font = font_load(s, "ramefbcp", 0, analog && ratio > 1 ? s->screen_height / 4 : s->screen_width / 5);
-		update_time(&tv, &tm, time_buf);
+		update_time(&tv, &tm, time_buf, mode);
 		font_get_text_extent(font, time_buf, &digital_w, &digital_h);
 	}
 
@@ -272,7 +313,7 @@ int main(int argc, char **argv)
 	}
 
 	while (1) {
-		update_time(&tv, &tm, time_buf);
+		update_time(&tv, &tm, time_buf, mode);
 
 		if (mosq && mosquitto_loop(mosq, 0, 1) && tv.tv_sec - last_reconn_attempt > 5) {
 			alert_state = '0';
