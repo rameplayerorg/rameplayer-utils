@@ -276,7 +276,17 @@ int main(int argc, char **argv)
 	background_rect = create_rect(0, 0, s->screen_width, s->screen_height);
 
 	if (digital) {
-		font = font_load(s, "ramefbcp", 0, analog && ratio > 1 ? s->screen_height / 4 : s->screen_width / 5);
+		unsigned int size;
+		if (analog)
+			size = ratio > 1 ? s->screen_height / 4 : s->screen_width / 5;
+		else
+		{
+			if (mode == MODE_STOPWATCH)
+				size = ratio > 1 ? s->screen_height * 2 / 5 : s->screen_width * 2 / 7;
+			else
+				size = ratio > 1 ? s->screen_height / 3 : s->screen_width / 4;
+		}
+		font = font_load(s, "ramefbcp", 0, size);
 		update_time(&tv, &tm, time_buf, mode);
 		font_get_text_extent(font, time_buf, &digital_w, &digital_h);
 	}
