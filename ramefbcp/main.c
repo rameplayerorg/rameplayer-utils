@@ -16,7 +16,7 @@
 
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 3
+#define VERSION_MINOR 4
 #define VERSION_PATCH 0
 
 #define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
@@ -206,13 +206,22 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
             // e.g. "S:4" or "S3:5"
             int rown = -1;
             int value = -1;
+            int valuepos = 0;
             if (line[1] == ':')
-                value = line[2] - '0';
+                valuepos = 2;
             else
             {
                 if (line[2] == ':')
-                    value = line[3] - '0';
+                    valuepos = 3;
                 rown = line[1] - '1';
+            }
+            if (valuepos > 0)
+            {
+                int ch = line[valuepos];
+                if (ch >= '0' && ch <= '9')
+                    value = ch - '0';
+                else if (ch >= 'A' && ch <= 'Z')
+                    value = ch - 'A' + 10;
             }
             if (value < 0 || value >= INFODISPLAY_ICON_COUNT)
                 value = INFODISPLAY_ICON_NONE;

@@ -902,6 +902,16 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
             }
             else if (disp->info_row_icon[row] == INFODISPLAY_ICON_PLAYLIST)
                 icon = icon_playlist;
+            else if (disp->info_row_icon[row] == INFODISPLAY_ICON_RECORDING)
+            {
+                icon = icon_filledcircle;
+                icon_color = 0xffec380e;
+            }
+            else if (disp->info_row_icon[row] == INFODISPLAY_ICON_STREAMING)
+            {
+                icon = icon_filledcircle;
+                icon_color = 0xffffcf0f;
+            }
             if (icon != NULL)
             {
                 int icon_y = y + (disp->row_height - ICON_HEIGHT) / 2;
