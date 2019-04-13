@@ -1,4 +1,4 @@
-/* Copyright 2015,2016 rameplayerorg
+/* Copyright 2015-2019 rameplayerorg
  * Licensed under GPLv2, which you must read from the included LICENSE file.
  *
  * Info display code for part of the LCD screen (secondary framebuffer).
@@ -876,6 +876,8 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
             unsigned char *icon = NULL;
             if (disp->info_row_icon[row] == INFODISPLAY_ICON_PLAYING)
                 icon = icon_playing;
+            else if (disp->info_row_icon[row] == INFODISPLAY_ICON_REPEATPLAYING)
+                icon = icon_repeatplay;
             else if (disp->info_row_icon[row] == INFODISPLAY_ICON_PAUSED)
                 icon = icon_paused;
             else if (disp->info_row_icon[row] == INFODISPLAY_ICON_STOPPED)
