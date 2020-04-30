@@ -647,7 +647,7 @@ void infodisplay_set_row_color(INFODISPLAY *disp, int row, unsigned long color, 
 }
 
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
-void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text)
+void infodisplay_set_row_text(INFODISPLAY *disp, int row, int type, const char *text)
 {
     #ifdef DEBUG_SUPPORT
     if (row < 0 || row >= INFODISPLAY_ROW_COUNT)
@@ -675,55 +675,23 @@ void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text)
         // note: if realloc failed, earlier mem block is still used (if any)
     }
 
-    if (disp->info_row_mem[row] > 0)
-    {
-        strncpy(disp->info_rows[row], text, disp->info_row_mem[row]);
-        disp->info_rows[row][disp->info_row_mem[row] - 1] = 0;
-        disp->info_row_scroll_time_s[row] = 0;
-
-        draw_text_to_row_textsurf(disp, row, disp->info_rows[row]);
-
-        // after moving rendering here, we technically wouldn't need to store
-        // the string itself anymore. (but it's kept in the struct for now)
-    }
-
-    disp->info_row_type[row] = INFODISPLAY_ROW_TYPE_TEXT;
-
-    #ifdef DEBUG_SUPPORT
-    dbg_printf("infodisplay_set_row_text: '%s', width %d\n",
-               disp->info_rows[row], disp->info_row_text_width[row]);
-    #endif
-}
-
-// row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
-void infodisplay_set_row_clock(INFODISPLAY *disp, int row, const char *text)
-{
-    #ifdef DEBUG_SUPPORT
-    if (row < 0 || row >= INFODISPLAY_ROW_COUNT)
-    {
-        dbg_printf("infodisplay_set_row_clock: Invalid row number %d\n", row);
-        return;
-    }
-    #endif
-
-    if (disp->info_row_type[row] != INFODISPLAY_ROW_TYPE_CLOCK)
-        infodisplay_reset_row_scroll(disp, row);
-
-    infodisplay_set_row_text(disp, row, text);
-    disp->info_row_type[row] = INFODISPLAY_ROW_TYPE_CLOCK;
-}
-
-// reset scroll position of row
-void infodisplay_reset_row_scroll(INFODISPLAY *disp, int row)
-{
-    if (row < 0 || row >= INFODISPLAY_ROW_COUNT)
-    {
-        #ifdef DEBUG_SUPPORT
-        dbg_printf("infodisplay_reset_row_scroll: Invalid row number %d\n", row);
-        #endif
-        return;
-    }
     disp->info_row_scroll_time_s[row] = 0;
+    disp->info_row_last_update[row] = 0;
+
+    if (disp->info_row_mem[row])
+    {
+        strlcpy(disp->info_rows[row], text, disp->info_row_mem[row]);
+
+        if (type != INFODISPLAY_ROW_TYPE_CLOCK)
+            draw_text_to_row_textsurf(disp, row, disp->info_rows[row]);
+    }
+
+    disp->info_row_type[row] = type;
+
+    #ifdef DEBUG_SUPPORT
+    dbg_printf("infodisplay_set_row_text: type %d, '%s', width %d\n",
+               type, disp->info_rows[row], disp->info_row_text_width[row]);
+    #endif
 }
 
 // sets row icon
@@ -784,7 +752,7 @@ void infodisplay_set_row_times(INFODISPLAY *disp, int row, int time1_ms, int tim
         }
         strcat(res, tmp);
     }
-    infodisplay_set_row_text(disp, row, res);
+    infodisplay_set_row_text(disp, row, INFODISPLAY_ROW_TYPE_TEXT, res);
 }
 
 
@@ -930,16 +898,23 @@ void infodisplay_update(INFODISPLAY *disp, int *ret_req)
 
             if (disp->info_row_type[row] == INFODISPLAY_ROW_TYPE_CLOCK)
             {
-                // always update text row surface for clock rows
-                const char *prefix = disp->info_rows[row];
-                time_t caltime;
-                struct tm *tm_info;
-                char tmp[32];
-                time(&caltime);
-                tm_info = localtime(&caltime);
-                snprintf(tmp, 32, "%s%02d:%02d:%02d", prefix,
-                         tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec);
-                draw_text_to_row_textsurf(disp, row, tmp);
+                time_t now = time(NULL);
+                if (now != disp->info_row_last_update[row])
+                {
+                    // always update text row surface for clock rows
+                    const char *prefix = disp->info_rows[row];
+                    struct tm tm;
+                    char tmp[32];
+                    localtime_r(&now, &tm);
+                    if (strchr(prefix, '%')) {
+                        strftime(tmp, sizeof tmp, prefix, &tm);
+                    } else {
+                        snprintf(tmp, sizeof tmp, "%s%02d:%02d:%02d", prefix,
+                                 tm.tm_hour, tm.tm_min, tm.tm_sec);
+                    }
+                    draw_text_to_row_textsurf(disp, row, tmp);
+                    disp->info_row_last_update[row] = now;
+                }
                 scroll_enabled = 0; // scrolling is not supported for clock rows
                 req_refresh = 1; // TODO: more fine-grained refresh req (scheduled time)
             }

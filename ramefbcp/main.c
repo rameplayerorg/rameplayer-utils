@@ -16,7 +16,7 @@
 
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 4
+#define VERSION_MINOR 5
 #define VERSION_PATCH 0
 
 #define TTF_DEFAULT_FILENAME "/usr/share/fonts/TTF/ramefbcp.ttf"
@@ -31,7 +31,6 @@
 static int s_alive = 1;
 
 static const char *s_ttf_filename = NULL;
-
 
 static void print_fb_info(struct fb_var_screeninfo *vinfo, struct fb_fix_screeninfo *finfo)
 {
@@ -114,15 +113,18 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
     switch (line[0])
     {
         case 'X':
+        case 'C':
         {
             // text to row number [1..INFODISPLAY_ROW_COUNT], max 9 rows.
             // e.g. "X1:Please wait..."
+            // or cfg row to display automatically updated local time, with prefix text
+            // e.g. "C3:UTC+0200 "
+            int type = line[0] == 'X' ? INFODISPLAY_ROW_TYPE_TEXT : INFODISPLAY_ROW_TYPE_CLOCK;
             int rown = line[1] - '1';
             if (rown >= 0 && rown < INFODISPLAY_ROW_COUNT &&
                 line[2] == ':')
             {
-                infodisplay_set_row_text(infodisplay, rown, &line[3]);
-                infodisplay_reset_row_scroll(infodisplay, rown);
+                infodisplay_set_row_text(infodisplay, rown, type, &line[3]);
             }
         }
         break;
@@ -148,19 +150,6 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
             {
                 unsigned long color = parse_hex_color(tmp);
                 infodisplay_set_row_color(infodisplay, rown, color, bkg_color);
-            }
-        }
-        break;
-
-        case 'C':
-        {
-            // cfg row to display automatically updated local time, with prefix text
-            // e.g. "C3:UTC+0200 "
-            int rown = line[1] - '1';
-            if (rown >= 0 && rown < INFODISPLAY_ROW_COUNT &&
-                line[2] == ':')
-            {
-                infodisplay_set_row_clock(infodisplay, rown, &line[3]);
             }
         }
         break;
@@ -263,6 +252,13 @@ static void translate_input_line(INFODISPLAY *infodisplay, int *video_enabled, c
             tmp[comma] = 0;
             t1 = atoi(tmp);
             infodisplay_set_row_times(infodisplay, INFODISPLAY_ROW_COUNT - 1, t1, t2);
+        }
+        break;
+
+        case '$':
+        {
+            if (strncmp(line, "$:TZ=", 5) == 0)
+                setenv("TZ", &line[5], 1);
         }
         break;
     }

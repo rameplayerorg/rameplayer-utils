@@ -67,6 +67,7 @@ typedef struct _INFODISPLAY
     int info_row_text_width[INFODISPLAY_ROW_COUNT]; // cached text width
     unsigned long info_row_color[INFODISPLAY_ROW_COUNT]; // text color for each row
     unsigned long info_row_bkg_color[INFODISPLAY_ROW_COUNT]; // background color for each row
+    time_t info_row_last_update[INFODISPLAY_ROW_COUNT]; // last time update
 } INFODISPLAY;
 
 
@@ -85,11 +86,7 @@ extern void infodisplay_set_progress(INFODISPLAY *disp, int row, float progress,
 // row=[0..INFODISPLAY_ROW_COUNT[, color and bkg_color as 0xAARRGGBB (AA not used for now)
 extern void infodisplay_set_row_color(INFODISPLAY *disp, int row, unsigned long color, unsigned long bkg_color);
 // row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
-extern void infodisplay_set_row_text(INFODISPLAY *disp, int row, const char *text);
-// row=[0..INFODISPLAY_ROW_COUNT[, text in UTF8
-extern void infodisplay_set_row_clock(INFODISPLAY *disp, int row, const char *text);
-// reset scroll position of row
-extern void infodisplay_reset_row_scroll(INFODISPLAY *disp, int row);
+extern void infodisplay_set_row_text(INFODISPLAY *disp, int row, int type, const char *text);
 // sets row icon
 extern void infodisplay_set_row_icon(INFODISPLAY *disp, int row, INFODISPLAY_ICON icon);
 // shorthand for formatting given row to given times in [h:]mm:ss.0 / [h:]mm:ss.0 format
